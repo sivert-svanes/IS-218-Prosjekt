@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Title</title>
+    <script src='https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js'></script>
+    <link href='https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css' rel='stylesheet' />
+</head>
+<body>
+<div id="map" style="height: 100dvh; width: 100dvw;"></div>
+</body>
+
+<script>
+    var map = new maplibregl.Map({
+        container: 'map', // container id
+        style: 'https://tiles.openfreemap.org/styles/positron', // style URL
+        center: [0, 0], // starting position [lng, lat]
+        zoom: 2 // starting zoom
+    });
+</script>
+</html>
