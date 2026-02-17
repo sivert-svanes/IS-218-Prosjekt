@@ -3,19 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <title>Title</title>
-    <script src='https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js'></script>
-    <link href='https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css' rel='stylesheet' />
 </head>
 <body>
 <div id="map" style="height: 100dvh; width: 100dvw;"></div>
-</body>
 
-<script>
-    var map = new maplibregl.Map({
-        container: 'map', // container id
-        style: 'https://tiles.openfreemap.org/styles/positron', // style URL
-        center: [0, 0], // starting position [lng, lat]
-        zoom: 2 // starting zoom
-    });
-</script>
+<!-- Load MapLibre CDN first (provides global `maplibregl`) -->
+<script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+<link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
+
+<!-- Load compiled frontend script as a module (generated from TypeScript) -->
+<script type="module" src="{{ url_for('static', filename='js/main.js') }}?v={{ ts }}"></script>
+</body>
 </html>

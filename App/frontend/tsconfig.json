@@ -1,0 +1,15 @@
+﻿{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "es6",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "rootDir": "src",
+    "outDir": "../static/js",
+    "sourceMap": true
+  },
+  "include": ["src/**/*"]
+}
