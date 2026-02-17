@@ -1,5 +1,14 @@
 ﻿// Use the global provided by the CDN instead of importing a node-style package
-const maplibregl = (window as any).maplibregl;
+import type * as MaplibreGL from 'maplibre-gl';
+
+declare global {
+  interface Window {
+    // The global injected by the CDN; optional because it may not be present in some environments
+    maplibregl?: typeof MaplibreGL;
+    // Exposed for debugging
+    map?: MaplibreGL.Map;
+  }
+}
 
 // Wait for DOM to ensure #map exists
 document.addEventListener('DOMContentLoaded', () => {
@@ -9,14 +18,16 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
 
-  // Initialize MapLibre map (same options as original inline script)
-  const map = new (maplibregl as any).Map({
+  const maplibregl = window.maplibregl;
+  if (!maplibregl) {
+    console.warn('MapLibre GL not found on window as maplibregl');
+    return;
+  }
+
+  window.map = new maplibregl.Map({
     container: 'map',
     style: 'https://tiles.openfreemap.org/styles/positron',
-    center: [0, 0],
-    zoom: 2
+    center: [0, 0] as [number, number],
+    zoom: 6
   });
-
-  // Expose for debugging
-  (window as any).map = map;
 });
