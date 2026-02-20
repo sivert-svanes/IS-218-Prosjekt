@@ -2,16 +2,22 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Title</title>
+  <link rel="stylesheet" href="/App/style/style.css">
+  <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
 </head>
-<body>
-<div id="map" style="height: 100dvh; width: 100dvw;"></div>
 
-<!-- Load MapLibre CDN first (provides global `maplibregl`) -->
-<script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
-<link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
-
-<!-- Load compiled frontend script as a module (generated from TypeScript) -->
-<script type="module" src="{{ url_for('static', filename='js/main.js') }}?v={{ ts }}"></script>
+<body style="margin: 0;">
+  <div id="map" style="height: 100dvh; width: 100dvw;"></div>
+  <div class="map-overlay container">
+    <div class="header box">Map Application</div>
+    <div class="box text">Filters</div>
+    <div class="box text">Controls</div>
+  </div>
+  <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v={{ ts }}"
+        onerror="this.onerror=null;let s=document.createElement('script');s.type='module';s.src='../static/js/main.js';document.body.appendChild(s);">
+  </script>
 </body>
 </html>

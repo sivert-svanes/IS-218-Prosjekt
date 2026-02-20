@@ -1,0 +1,71 @@
+﻿.map-overlay {
+    
+    position: absolute;
+    top: 0;
+    right: auto;
+    background: rgba(0,0,0,0.65);
+    color: #fff;
+    padding: 4px;
+    border-bottom-right-radius: 6px;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    font-size: 12px;
+    z-index: 100;
+    pointer-events: auto;
+    width: 75vmax;
+    max-width: 75vw;
+    max-height: 64px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+    backdrop-filter: blur(0.1rem);
+    will-change: backdrop-filter;
+}
+
+.header {
+    font-family: Tahoma, Geneva, sans-serif;
+    font-size: 1.5rem; /* ~28px */
+    font-weight: 500;
+    line-height: 1.2;
+    color: #c2c8ca;
+}
+
+.text {
+    font-family: Tahoma, Geneva, sans-serif;
+    font-size: 1.0rem;
+    line-height: 1.2;
+    color: #c2c8ca;
+    
+}
+
+.box {
+    max-width: max-content;
+    background: rgba(0,0,0,0.5);
+    box-shadow: 0 4px 4px rgba(0,0,0,0.35);
+    margin: 0.25rem 0.25rem 0.25rem 0.25rem;
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    
+}
+
+.button{
+    cursor: pointer;
+}
+
+.container {
+  display: grid;
+  grid-template-columns: auto auto auto;
+  padding: 0.25rem;
+  grid-gap: 0.25rem;
+  max-width: max-content;
+  align-items: center;
+}
+
+.container div {
+    max-width: max-content;
+    background: rgba(0,0,0,0.5);
+    box-shadow: 0 4px 4px rgba(0,0,0,0.35);
+    padding: 0.25rem;
+    border-radius: 0.25rem;
+    display: flex;
+    height: 75%;
+    align-items: center;
+    justify-content: center;
+}
