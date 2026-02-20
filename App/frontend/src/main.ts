@@ -10,24 +10,14 @@ declare global {
   }
 }
 
-// Wait for DOM to ensure #map exists
-document.addEventListener('DOMContentLoaded', () => {
-  const mapEl = document.getElementById('map');
-  if (!mapEl) {
-    console.warn('Map element #map not found');
-    return;
-  }
+const maplibregl = window.maplibregl;
+if (!maplibregl) {
+  console.warn('MapLibre GL not found on window as maplibregl');
+}
 
-  const maplibregl = window.maplibregl;
-  if (!maplibregl) {
-    console.warn('MapLibre GL not found on window as maplibregl');
-    return;
-  }
-
-  window.map = new maplibregl.Map({
-    container: 'map',
-    style: 'https://tiles.openfreemap.org/styles/positron',
-    center: [0, 0] as [number, number],
-    zoom: 6
-  });
+window.map = new maplibregl.Map({
+  container: 'map' as string,
+  style: 'https://tiles.openfreemap.org/styles/positron' as string,
+  center: [0, 0] as [number, number],
+  zoom: 6 as number
 });
