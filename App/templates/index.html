@@ -17,7 +17,7 @@
     <div class="box text">Controls</div>
   </div>
   <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v={{ ts }}"
-        onerror="this.onerror=null;let s=document.createElement('script');s.type='module';s.src='../static/js/main.js';document.body.appendChild(s);">
+        onerror="let s=document.createElement('script');s.type='module';s.src='../static/js/main.js';document.body.appendChild(s);">
   </script>
 </body>
 </html>
