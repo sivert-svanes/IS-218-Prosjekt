@@ -1,5 +1,6 @@
 ﻿// Use the global provided by the CDN instead of importing a node-style package
 import type * as MaplibreGL from 'maplibre-gl';
+import {LngLatLike} from "maplibre-gl";
 
 declare global {
   interface Window {
@@ -18,6 +19,22 @@ if (!maplibregl) {
 window.map = new maplibregl.Map({
   container: 'map' as string,
   style: 'https://tiles.openfreemap.org/styles/positron' as string,
-  center: [0, 0] as [number, number],
-  zoom: 6 as number
+  center: [0, 0] as LngLatLike,
+  zoom: 6 as number,
+});
+
+const geolocate = new maplibregl.GeolocateControl({
+  positionOptions: { enableHighAccuracy: true as boolean },
+  trackUserLocation: true as boolean,
+  showAccuracyCircle: true as boolean,
+});
+
+window.map.addControl(geolocate, 'top-right');
+window.map.on('load', () => {
+  try {
+    geolocate?.trigger();
+  }
+  catch (err) {
+    console.warn('Geolocate trigger failed:', err);
+  }
 });
