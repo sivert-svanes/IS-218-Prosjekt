@@ -1,37 +1,29 @@
-﻿import sqlalchemy
+﻿import os
+import sqlalchemy
 from sqlalchemy import text
 from dotenv import load_dotenv
-from geoalchemy2 import Geometry
-from sqlalchemy import Column, Integer, String
-import os
-
 
 load_dotenv()
-connStr = os.getenv("DATABASE_URL")
+CONN_STR = os.getenv("DATABASE_URL")
 
-def create_connection():
-    #Put inn the env variable in the create engine function
-    print(connStr)
-    engine = sqlalchemy.create_engine(connStr)
-    connection = engine.connect()
-    return connection
 
-def database_test_query(connection):
-    with connection as conn:
+def create_engine():
+    if not CONN_STR:
+        raise ValueError("DATABASE_URL mangler i .env / environment.")
+    return sqlalchemy.create_engine(CONN_STR, future=True)
+
+
+def database_test_query(engine):
+    with engine.connect() as conn:
         result = conn.execute(text("SELECT * FROM pg_catalog.pg_tables;"))
         print(result.all())
 
-def get_brannstasjoner(connection):
-    with connection as conn:
-        result = conn.execute(text("SELECT brannvesen FROM brannstasjoner — Brannstasjon;"))
-        return result.all()
 
-class BrannstasjonerModel():
-    id = Column(Integer, primary_key=True)
-    geom = Column(Geometry(geometry_type='POINT', srid=4326))
-    gml_id = Column(String)
-    opphav = Column(String)
-    brannstasjon = Column(String)
-    brannvesen = Column(String)
-    stasjonstype = Column(String)
-    kasernert = Column(String)
+def get_brannstasjoner(engine):
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT brannvesen
+            FROM public.brannstasjoner
+            LIMIT 1000;
+        """))
+        return result.all()
