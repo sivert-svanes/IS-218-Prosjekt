@@ -11,6 +11,7 @@ connStr = os.getenv("DATABASE_URL")
 
 def create_connection():
     #Put inn the env variable in the create engine function
+    print(connStr)
     engine = sqlalchemy.create_engine(connStr)
     connection = engine.connect()
     return connection
@@ -19,6 +20,11 @@ def database_test_query(connection):
     with connection as conn:
         result = conn.execute(text("SELECT * FROM pg_catalog.pg_tables;"))
         print(result.all())
+
+def get_brannstasjoner(connection):
+    with connection as conn:
+        result = conn.execute(text("SELECT brannvesen FROM brannstasjoner — Brannstasjon;"))
+        return result.all()
 
 class BrannstasjonerModel():
     id = Column(Integer, primary_key=True)
