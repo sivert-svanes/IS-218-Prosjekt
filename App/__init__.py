@@ -1,19 +1,22 @@
 ﻿from flask import Flask
-import sqlalchemy
-from sqlalchemy import text
 from App import database
+
+
 def create_app():
-    application = Flask(__name__)
+    app = Flask(__name__)
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
-    # Disable static file cache during development so the browser doesn't get 304 Not Modified
-    application.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+    engine = database.create_engine()
 
-    application.run()
+    database.database_test_query(engine)
 
-    connection = database.create_connection()
+    rows = database.get_brannstasjoner(engine)
+    print(rows)
 
-    database.database_test_query(connection)
-    #database.get_brannstasjoner(connection)
-    return application
+    return app
+
 
 app = create_app()
+
+if __name__ == "__main__":
+    app.run(debug=True)
