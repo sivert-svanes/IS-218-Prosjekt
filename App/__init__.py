@@ -1,7 +1,7 @@
 ﻿from flask import Flask
 import sqlalchemy
 from sqlalchemy import text
-import database
+from App import database
 def create_app():
     application = Flask(__name__)
 
@@ -9,12 +9,11 @@ def create_app():
     application.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
 
     application.run()
-    print(sqlalchemy.__version__)
 
     connection = database.create_connection()
 
     database.database_test_query(connection)
-
+    #database.get_brannstasjoner(connection)
     return application
 
 app = create_app()
