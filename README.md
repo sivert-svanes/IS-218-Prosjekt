@@ -18,20 +18,11 @@ A verry nice little project to do stuff and be a good person.
 > [!IMPORTANT]
 > <details>
 > <summary style="font-size: 14px; font-weight: bold">1. Using build.py </summary>
+> 1. In root directory run build.py
 >
-> 1. Setup python environment
->    1. Create virtual env
->       ```powershell
->       py -3 -m venv .venv
->       ```
->    2. Activate virtual env
->       ```powershell
->       .venv\Scripts\activate
->       ```
-> 2. Run build.py
->   ```powershell
->   python build.py
->   ```
+>    ```powershell
+>     python build.py
+>    ```
 > </details>
 
 
