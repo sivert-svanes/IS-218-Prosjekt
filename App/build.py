@@ -4,6 +4,7 @@ import subprocess
 
 os.system("pip install flask")
 os.system("pip install sqlalchemy")
+os.system("pip install GeoAlchemy2")
 os.system("pip install psycopg2")
 os.system("pip install psycopg")
 
