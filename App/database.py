@@ -2,6 +2,7 @@
 from sqlalchemy import text
 
 def create_connection():
+    #Put inn the env variable in the create engine function
     engine = sqlalchemy.create_engine("")
     connection = engine.connect()
     return connection
