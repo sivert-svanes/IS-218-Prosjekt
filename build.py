@@ -29,7 +29,7 @@ start = input()
 
 if start == "y":
     if platform.system() == "Windows":
-        subprocess.run(["powershell", r'.venv\Scripts\activate; flask --app .\App\app.py run --debug'])
+        subprocess.run(["powershell", r'.\.venv\Scripts\activate; flask --app .\App\app.py run --debug'])
     else:
         #not tested outside windows, so IDK if this works
         subprocess.run([r'.venv/Scripts/activate; flask --app /App/app.py run --debug'])
