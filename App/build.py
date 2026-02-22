@@ -7,6 +7,8 @@ os.system("pip install sqlalchemy")
 os.system("pip install GeoAlchemy2")
 os.system("pip install psycopg2")
 os.system("pip install psycopg")
+os.system("pip install python-dotenv")
+os.system("pip install spglib")
 
 if platform.system() == "Windows":
     subprocess.run(["powershell", r'cd .\frontend\; npm install; npm run build '])
