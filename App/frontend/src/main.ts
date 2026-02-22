@@ -1,5 +1,6 @@
 ﻿// Use the global provided by the CDN instead of importing a node-style package
 import type * as MaplibreGL from 'maplibre-gl';
+import {LngLatLike} from "maplibre-gl";
 
 declare global {
   interface Window {
@@ -10,24 +11,39 @@ declare global {
   }
 }
 
-// Wait for DOM to ensure #map exists
-document.addEventListener('DOMContentLoaded', () => {
-  const mapEl = document.getElementById('map');
-  if (!mapEl) {
-    console.warn('Map element #map not found');
-    return;
-  }
-
-  const maplibregl = window.maplibregl;
-  if (!maplibregl) {
-    console.warn('MapLibre GL not found on window as maplibregl');
-    return;
-  }
-
-  window.map = new maplibregl.Map({
-    container: 'map',
-    style: 'https://tiles.openfreemap.org/styles/positron',
-    center: [0, 0] as [number, number],
-    zoom: 6
+const maplibregl = window.maplibregl;
+if (!maplibregl) {
+  console.warn('MapLibre GL not found on window as maplibregl');
+} else {
+  // Create a local `map` variable so TypeScript knows it's defined when we call methods on it.
+  const map = new maplibregl.Map({
+    container: 'map' as string,
+    style: 'https://tiles.openfreemap.org/styles/positron' as string,
+    center: [0, 0] as LngLatLike,
+    zoom: 6 as number,
   });
-});
+
+  window.map = map;
+
+  map.on('style.load', () => {
+    map.setProjection({
+      type: 'globe',
+    });
+  });
+
+  const geolocate = new maplibregl.GeolocateControl({
+    positionOptions: { enableHighAccuracy: true as boolean },
+    trackUserLocation: true as boolean,
+    showAccuracyCircle: true as boolean,
+  });
+
+  map.addControl(geolocate, 'top-right');
+  map.on('load', () => {
+    try {
+      geolocate?.trigger();
+    }
+    catch (err) {
+      console.warn('Geolocate trigger failed:', err);
+    }
+  });
+}
