@@ -1,6 +1,7 @@
 ﻿from flask import Flask
 import sqlalchemy
 from sqlalchemy import text
+import database
 def create_app():
     application = Flask(__name__)
 
@@ -9,12 +10,10 @@ def create_app():
 
     application.run()
     print(sqlalchemy.__version__)
-    engine = sqlalchemy.create_engine("")
-    connection = engine.connect()
 
-    with connection as conn:
-        result = conn.execute(text("SELECT * FROM pg_catalog.pg_tables;"))
-        print(result.all())
+    connection = database.create_connection()
+
+    database.database_test_query(connection)
 
     return application
 
