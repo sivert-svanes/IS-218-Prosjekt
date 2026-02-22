@@ -9,43 +9,72 @@ A verry nice little project to do stuff and be a good person.
 - Flask
 
 ## 2. Setup
-1. Clone repo
+
+ 1. Clone repo
    ```powershell
     git clone https://github.com/sivert-svanes/IS-218-Prosjekt.git
    ```
-2. Compile typescript
-    1. CD to frontend folder
-        ```powershell
-        cd App\frontend
-       ```
-    2. Install dependencies
-        ```powershell
-        npm install
-       ```
-    3. Compile typescript
-        ```powershell
-        npm run build
-       ```
-3. Setup python environment
-   1. CD root folder
-   2. Setup virtual env
-      1. Create virtual env
-         ```powershell
-         py -3 -m venv .venv
-         ```
-      2. Activate virtual env
-           ```powershell
-           .venv\Scripts\activate
-           ```
-    3. Install dependencies
-        1. Install Flask
-              ```powershell
-              pip install Flask
-              ```
-4. Start server, from root folder
-   ```powershell
-    flask --app .\App\app.py run --debug
-    ```
+
+> [!IMPORTANT]
+> <details>
+> <summary style="font-size: 14px; font-weight: bold">1. Using build.py </summary>
+>
+> 1. Setup python environment
+>    1. Create virtual env
+>       ```powershell
+>       py -3 -m venv .venv
+>       ```
+>    2. Activate virtual env
+>       ```powershell
+>       .venv\Scripts\activate
+>       ```
+> 2. Run build.py
+>   ```powershell
+>   python build.py
+>   ```
+> </details>
+
+
+> [!IMPORTANT]
+> <details>
+> <summary style="font-size: 14px; font-weight: bold">2. Manual setup </summary>
+>
+>
+> 1. Compile typescript
+>     1. CD to frontend folder
+>         ```powershell
+>         cd App\frontend
+>        ```
+>     2. Install dependencies
+>         ```powershell
+>         npm install
+>        ```
+>     3. Compile typescript
+>         ```powershell
+>        npm run build
+>        ```
+> 2. Setup python environment
+>    1. CD root folder
+>    2. Setup virtual env
+>       1. Create virtual env
+>          ```powershell
+>          py -3 -m venv .venv
+>          ```
+>       2. Activate virtual env
+>            ```powershell
+>            .venv\Scripts\activate
+>            ```
+>     3. Install dependencies
+>         1. Install Flask
+>               ```powershell
+>               pip install Flask
+>               ```
+> 3. Start server, from root folder
+>   ```powershell
+>     flask --app .\App\app.py run --debug
+>     ```
+> </details>
+
     
     
 - Prosjektnavn & TLDR: Hva løser dette kartet? (Maks 3 setninger).
