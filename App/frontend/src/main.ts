@@ -1,6 +1,6 @@
 ﻿// Use the global provided by the CDN instead of importing a node-style package
 import type * as MaplibreGL from 'maplibre-gl';
-import {LngLatLike, PropertyValueSpecification} from "maplibre-gl";
+import {AddLayerObject, LayerSpecification, LngLatLike, PropertyValueSpecification} from "maplibre-gl";
 
 
 declare global {
@@ -49,6 +49,26 @@ if (!maplibregl) {
   map.on('style.load', () => {
     map.setProjection({
       type: 'globe',
+    });
+
+    // Stars layer
+    import("./starsLayer.js").then(({ createStarsLayer }) => {
+      try {
+        const starsLayer = createStarsLayer({
+          id: 'stars',
+          intensity: 1.0,
+          density: 0.15,
+        });
+        if (!map.getLayer('stars')) {
+          const layers : LayerSpecification[] = map.getStyle().layers;
+          const firstLayerId : string | undefined = layers && layers.length > 0 ? layers[0].id : undefined;
+          map.addLayer(starsLayer as AddLayerObject, firstLayerId);
+        }
+      } catch (err) {
+        console.warn('Failed to add stars layer:', err);
+      }
+    }).catch((err: any) => {
+      console.warn('Failed to load starsLayer module:', err);
     });
 
     const LIGHT_THETA_DEG : number = -37;
