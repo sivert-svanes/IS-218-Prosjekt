@@ -22,8 +22,21 @@ def database_test_query(engine):
 def get_brannstasjoner(engine):
     with engine.connect() as conn:
         result = conn.execute(text("""
-            SELECT brannvesen
-            FROM public.brannstasjoner
-            LIMIT 1000;
+            SELECT json_build_object(
+                'type', 'FeatureCollection',
+                'features', COALESCE(json_agg(
+                    json_build_object(
+                        'type', 'Feature',
+                        'geometry', ST_AsGeoJSON(geom)::json,
+                        'properties', to_jsonb(t.*) - 'geom'
+                    )
+                ), '[]'::json)
+            ) AS geojson
+            FROM (
+                SELECT *
+                FROM public.brannstasjoner
+                LIMIT 1000
+            ) t;
         """))
-        return result.all()
+        row = result.fetchone()
+        return row[0] if row else {"type": "FeatureCollection", "features": []}

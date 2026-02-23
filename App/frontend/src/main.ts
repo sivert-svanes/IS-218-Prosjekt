@@ -45,5 +45,28 @@ if (!maplibregl) {
     catch (err) {
       console.warn('Geolocate trigger failed:', err);
     }
+
+    // Fetch brannstasjoner GeoJSON and add as a layer
+    fetch('/api/brannstasjoner')
+      .then(res => res.json())
+      .then((geojson) => {
+        map.addSource('brannstasjoner', {
+          type: 'geojson',
+          data: geojson,
+        });
+
+        map.addLayer({
+          id: 'brannstasjoner-circle' as string,
+          type: 'circle',
+          source: 'brannstasjoner' as string,
+          paint: {
+            'circle-radius': 6 as number,
+            'circle-color': '#e74c3c' as string,
+            'circle-stroke-width': 1 as number,
+            'circle-stroke-color': '#ffffff' as string,
+          },
+        });
+      })
+      .catch(err => console.error('Failed to load brannstasjoner:', err));
   });
 }
