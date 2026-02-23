@@ -17,7 +17,7 @@ def build():
     venv_dir = os.path.join(base_dir, '.venv')
 
     if not os.path.isdir(venv_dir):
-        subprocess.run('py -3 -m venv .venv', shell=True, check=True)
+        subprocess.run('python -m venv .venv', shell=True, check=True)
 
     if platform.system() == 'Windows':
         venv_python = os.path.join(venv_dir, 'Scripts', 'python.exe')
@@ -28,7 +28,7 @@ def build():
     if install_pkg.lower().startswith('y'):
         for pkg in packages:
             try:
-                os.system(f'pip install --quiet {pkg}')
+                subprocess.run([venv_python, '-m', 'pip', 'install', '--quiet', pkg], check=True)
             except Exception as e:
                 print(f"Warning: failed to install {pkg}: {e}")
                 return
