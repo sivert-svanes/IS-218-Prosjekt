@@ -48,6 +48,7 @@ def get_brannstasjoner_within_fylke(engine, fylke_id):
         result = conn.execute(text("""
             SELECT json_build_object(
                 'type', 'FeatureCollection',
+                'fylke_navn', (SELECT navn FROM public.fylker WHERE id = :fylke_id),
                 'features', COALESCE(json_agg(
                     json_build_object(
                         'type', 'Feature',
@@ -61,7 +62,7 @@ def get_brannstasjoner_within_fylke(engine, fylke_id):
                 FROM public.brannstasjoner b
                 WHERE ST_Within(
                     b.geom,
-                    (SELECT geofylke FROM public.fylker WHERE id = :fylke_id)
+                    (SELECT geomfylke FROM public.fylker WHERE id = :fylke_id)
                 )) t;
         """), {"fylke_id": fylke_id})
         row = result.fetchone()
