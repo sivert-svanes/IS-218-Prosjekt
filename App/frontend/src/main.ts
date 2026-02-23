@@ -1,6 +1,12 @@
 ﻿// Use the global provided by the CDN instead of importing a node-style package
 import type * as MaplibreGL from 'maplibre-gl';
-import {AddLayerObject, LayerSpecification, LngLatLike, PropertyValueSpecification} from "maplibre-gl";
+import {
+  AddLayerObject,
+  LayerSpecification,
+  LngLatLike,
+  MapGeoJSONFeature,
+  PropertyValueSpecification
+} from "maplibre-gl";
 
 
 declare global {
@@ -221,6 +227,51 @@ if (!maplibregl) {
             'circle-stroke-width': 1 as number,
             'circle-stroke-color': '#ffffff' as string,
           },
+        });
+
+        // Show popup on click for each brannstasjon marker
+        map.on('click', 'brannstasjoner-circle', (e) => {
+          if (!e.features || e.features.length === 0) return;
+
+          const feature: MapGeoJSONFeature = e.features[0];
+          const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
+          const props : {[name: string]: string;} = feature.properties || {};
+
+          // Build popup HTML from available properties
+          const name : string = props.brannstasjon || 'Ukjent stasjon';
+          const brannvesen : string = props.brannvesen || '';
+          const stasjonstype : string = props.stasjonstype || '';
+          const kasernert : string = props.kasernert || '';
+          const lon : string = coords[0].toFixed(6);
+          const lat : string = coords[1].toFixed(6);
+
+          const html = `
+            <div style="font-family: sans-serif; max-width: 260px;">
+              <h3 style="margin: 0 0 6px 0; font-size: 14px;">${name}</h3>
+              ${brannvesen ? `<p style="margin: 2px 0;"><strong>Brannvesen:</strong> ${brannvesen}</p>` : ''}
+              ${stasjonstype ? `<p style="margin: 2px 0;"><strong>Stasjonstype:</strong> ${stasjonstype}</p>` : ''}
+              ${kasernert ? `<p style="margin: 2px 0;"><strong>Kasernert:</strong> ${kasernert}</p>` : ''}
+              <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${lat}, ${lon}</p>
+            </div>
+          `;
+
+          // Ensure the popup appears over the correct copy of the feature if the map is zoomed out and wrapped
+          while (Math.abs(e.lngLat.lng - coords[0]) > 180) {
+            coords[0] += e.lngLat.lng > coords[0] ? 360 : -360;
+          }
+
+          new maplibregl.Popup({ offset: 10 })
+            .setLngLat(coords)
+            .setHTML(html)
+            .addTo(map);
+        });
+
+        // Use pointer cursor for markers
+        map.on('mouseenter', 'brannstasjoner-circle', () => {
+          map.getCanvas().style.cursor = 'pointer';
+        });
+        map.on('mouseleave', 'brannstasjoner-circle', () => {
+          map.getCanvas().style.cursor = '';
         });
       })
       .catch(err => console.error('Failed to load brannstasjoner:', err));
