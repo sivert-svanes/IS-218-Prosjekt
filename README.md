@@ -1,16 +1,25 @@
 # IS-218-Prosjekt
-A verry nice little project to do stuff and be a good person. 
 
-## 1. Dependencies
+## 0. Introduction – ShelterLog
+
+Our goal is to display public shelters and their current supplies on the map. The system will recognize locations with low supply
+and provide routes to get supplies, accounting for threats.
+
+## 1. Demo
+
+Add it here when it's done
+
+## 2. Dependencies
 
 - NodeJS
-  - Typescript
-  - MaplibreGL-gl-js
-- Flask
-- SQLAlchemy
-- GeoAlchemy2
+  - Typescript | ^4.9.5
+  - MaplibreGL-gl | ^4.7.1
+- Miniconda
+  - Flask | ^3.1.3
+  - SQLAlchemy | ^2.0.46
+  - GeoAlchemy2 | ^0.18.1
 
-## 2. Setup
+## 3. Setup
 
  1. Clone repo
    ```powershell
@@ -83,24 +92,19 @@ A verry nice little project to do stuff and be a good person.
 >     ```
 > </details>
 
-## 3. Data sources
+## 4. Data sources
 
-| Description  | Format  | Modifications    | Source                                                                                                                  |
-|--------------|---------|------------------|-------------------------------------------------------------------------------------------------------------------------|
-| Map style    | JSON    | Globe projection | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           |
-| Counties     | GeoJson | -> PostGIS       | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) |
-| Firestations | GML     | -> PostGIS       | [GeoNorge](https://kartkatalog.geonorge.no/metadata/brannstasjoner/0ccce81d-a72e-46ca-8bd9-57b362376485)                |
+| Description   | Format  | Modifications    | Source                                                                                                                  |
+|---------------|---------|------------------|-------------------------------------------------------------------------------------------------------------------------|
+| Map style     | JSON    | Globe projection | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           |
+| Counties      | GeoJson | -> PostGIS       | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) |
+| Fire stations | GML     | -> PostGIS       | [GeoNorge](https://kartkatalog.geonorge.no/metadata/brannstasjoner/0ccce81d-a72e-46ca-8bd9-57b362376485)                |
 
+## 5. Further additions
 
-
-    
-    
-- Prosjektnavn & TLDR: Hva løser dette kartet? (Maks 3 setninger).
-- Demo av system: Video / gif som demonstrerer systemet 
-- Teknisk Stack: Liste over biblioteker og versjoner. 
-- Datakatalog: En tabell som beskriver: | Datasett | Kilde | Format | Bearbeiding  
-- Arkitekturskisse: En enkel oversikt over hvordan data flyter fra kilde til kart. 
-- Refleksjon: Diskuter kort forbedringspunkter ved din nåværende løsning (4-5 setninger / punkter) 
+Currently, this is only this is only the base back-end of the project. Going forward, we will switch to a dateset that is relevant
+to the goals of the project. Some code in Main.ts will need to be refactored, as it currently has too much responsibility.
+We should also switch to using compiled plsql functions and procedures instead of raw SQL.
 
 ## 4. Arkitekturskisse
 <img width="722" height="912" alt="Arkitekturskisse(2)" src="https://github.com/user-attachments/assets/10ae8510-8e08-4c8c-8987-cc83ab4ec3df" />
