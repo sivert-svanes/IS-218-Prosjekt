@@ -31,24 +31,26 @@ if (!maplibregl) {
 
   window.map = map;
 
-  // ── Layer-toggle dropdown ──────────────────────────────────────
   const layersToggle = document.getElementById('layers-toggle');
   const layersMenu   = document.getElementById('layers-menu');
 
   // Open / close the dropdown when clicking the toggle button
+  const overlay = document.querySelector('.map-overlay') as HTMLElement | null;
   layersToggle?.addEventListener('click', (e) => {
     e.stopPropagation();
     layersMenu?.classList.toggle('open');
-    // Align the fixed menu with the toggle button
-    if (layersMenu?.classList.contains('open') && layersToggle) {
-      const rect = layersToggle.getBoundingClientRect();
-      layersMenu.style.top = (rect.bottom + 16) + 'px';
-      layersMenu.style.left = rect.left + 'px';
+    overlay?.classList.toggle('dropdown-open');
+    // Align dropdown to span the full overlay width
+    if (layersMenu?.classList.contains('open') && overlay) {
+      const overlayRect = overlay.getBoundingClientRect();
+      layersMenu.style.top = overlayRect.bottom + 'px';
+      layersMenu.style.left = overlayRect.left + 'px';
+      layersMenu.style.width = overlayRect.width + 'px';
     }
   });
-  // Close when clicking anywhere else on the page
   document.addEventListener('click', () => {
     layersMenu?.classList.remove('open');
+    overlay?.classList.remove('dropdown-open');
   });
   // Prevent clicks inside the menu from closing it
   layersMenu?.addEventListener('click', (e) => e.stopPropagation());
@@ -85,7 +87,6 @@ if (!maplibregl) {
     item.appendChild(span);
     layersMenu.appendChild(item);
   }
-  // ───────────────────────────────────────────────────────────────
 
   const geolocate = new maplibregl.GeolocateControl({
     positionOptions: { enableHighAccuracy: true as boolean },

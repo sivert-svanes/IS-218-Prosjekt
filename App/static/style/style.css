@@ -82,24 +82,33 @@
     flex: 1;
 }
 
+.map-overlay.dropdown-open {
+    border-bottom-right-radius: 0;
+    border-bottom-left-radius: 0;
+    clip-path: inset(-20px -20px 0px -20px);
+}
+
+
 .dropdown-menu {
     display: flex;
     position: fixed;
+    box-sizing: border-box;
     min-width: 180px;
-    z-index: 200;
+    z-index: 100;
     flex-direction: column;
     background: rgba(15,25,30,0.65);
     outline: 2px solid rgba(15,25,30,0.65);
     box-shadow: 0 4px 12px rgba(15,25,30,0.35);
     -webkit-backdrop-filter: blur(0.5rem);
-    backdrop-filter: blur(0.5rem);
+    backdrop-filter: blur(0.1rem);
     padding: 4px;
-    border-radius: 6px;
+    border-radius: 0 0 6px 6px;
+    clip-path: inset(0px -20px -20px -20px);
     visibility: hidden;
     opacity: 0;
     pointer-events: none;
-    transition: opacity 150ms ease-in-out, visibility 150ms ease-in-out;
 }
+
 
 .dropdown-menu.open {
     visibility: visible;
