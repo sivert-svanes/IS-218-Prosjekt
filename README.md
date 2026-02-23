@@ -102,4 +102,6 @@ A verry nice little project to do stuff and be a good person.
 - Arkitekturskisse: En enkel oversikt over hvordan data flyter fra kilde til kart. 
 - Refleksjon: Diskuter kort forbedringspunkter ved din nåværende løsning (4-5 setninger / punkter) 
 
+## 4. Arkitekturskisse
+![](C:\Users\siver\Downloads\Arkitekturskisse.png)
 ![Jork IT](https://media1.tenor.com/m/grh1asJHzg4AAAAC/freaky.gif)
