@@ -1,13 +1,15 @@
 ﻿from flask import Flask
+from App import database
+
 
 def create_app():
-    application = Flask(__name__)
+    app = Flask(__name__)
+    app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
-    # Disable static file cache during development so the browser doesn't get 304 Not Modified
-    application.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+    return app
 
-    application.run()
-
-    return application
 
 app = create_app()
+
+if __name__ == "__main__":
+    app.run(debug=True)
