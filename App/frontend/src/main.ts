@@ -85,8 +85,8 @@ if (!maplibregl) {
     // are fully active vs. fully faded out to the normal map style.
     // At or below FADE_ZOOM_START everything is in "globe/dark" mode.
     // At or above FADE_ZOOM_END everything matches the original bright style.
-    const FADE_ZOOM_START : number = 3;
-    const FADE_ZOOM_END : number = 8;
+    const FADE_ZOOM_START : number = 6;
+    const FADE_ZOOM_END : number = 10;
 
     // Calculate light position (radial distance, azimuthal angle, polar angle)
     const p = (Math.acos(Math.cos((LIGHT_THETA_DEG / 180 as number + 1 as number) * Math.PI)
