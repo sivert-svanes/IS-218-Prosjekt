@@ -105,41 +105,52 @@ export function createStarsLayer(options: StarsLayerOptions = {}) {
               -rotated.x * sinLng + rotated.z * cosLng
             );
 
-            // Convert to spherical coordinates
-            float lng = atan(rotated.x, rotated.z);
-            float lat = asin(rotated.y);
+            // ── Star field using cube-map projection ──────────────
+            // Project the rotated direction onto the dominant cube face
+            // and hash in that 2D space.  This avoids the equirectangular
+            // pole singularity entirely — stars are uniform everywhere.
 
-            vec2 uv = vec2(
-              (lng / PI) * 0.5 + 0.5,
-              (lat / (PI * 0.5)) * 0.5 + 0.5
-            );
+            vec3 absDir = abs(rotated);
+            vec2 faceUV;
+            float faceIndex;
 
-            // Create star field via hashed grid
-            vec2 scaledUV = uv * 200.0;
+            if (absDir.x >= absDir.y && absDir.x >= absDir.z) {
+              // ±X face
+              faceUV = rotated.yz / absDir.x;
+              faceIndex = rotated.x > 0.0 ? 0.0 : 1.0;
+            } else if (absDir.y >= absDir.x && absDir.y >= absDir.z) {
+              // ±Y face
+              faceUV = rotated.xz / absDir.y;
+              faceIndex = rotated.y > 0.0 ? 2.0 : 3.0;
+            } else {
+              // ±Z face
+              faceUV = rotated.xy / absDir.z;
+              faceIndex = rotated.z > 0.0 ? 4.0 : 5.0;
+            }
+
+            // faceUV is in [-1, 1], remap to [0, 1]
+            faceUV = faceUV * 0.5 + 0.5;
+
+            // Scale to create grid cells per face
+            float gridScale = 60.0;
+            vec2 scaledUV = faceUV * gridScale;
             vec2 gridPos = floor(scaledUV);
-            float hash = fract(sin(dot(gridPos, vec2(12.9898, 78.233))) * 43758.5453);
+
+            // Include face index in hash to avoid star duplication across faces
+            float faceHash = faceIndex * 17.0;
+            float hash = fract(sin(dot(gridPos + faceHash, vec2(12.9898, 78.233))) * 43758.5453);
 
             float stars = 0.0;
             if (hash > ${(1 - density).toFixed(2)}) {
-              float hashX = fract(sin(dot(gridPos, vec2(127.1, 311.7))) * 43758.5453);
-              float hashY = fract(sin(dot(gridPos, vec2(269.5, 183.3))) * 43758.5453);
+              float hashX = fract(sin(dot(gridPos + faceHash, vec2(127.1, 311.7))) * 43758.5453);
+              float hashY = fract(sin(dot(gridPos + faceHash, vec2(269.5, 183.3))) * 43758.5453);
               vec2 randomOffset = vec2(hashX, hashY);
               vec2 localPos = fract(scaledUV);
-              vec2 delta = (localPos - randomOffset);
-
-              // Correct for equirectangular projection distortion so stars
-              // are circular at every latitude.
-              // Grid cells span (2π/gridSize) in longitude but only
-              // (π/gridSize) in latitude — twice as wide angularly.
-              // Scaling delta.x by 2 makes a unit step in x represent
-              // the same angular distance as a unit step in y.
-              // cos(lat) further corrects for meridian convergence at poles.
-              float aspect = 2.0 * max(0.1, cos(lat));
-              delta.x *= aspect;
+              vec2 delta = localPos - randomOffset;
 
               float dist = length(delta);
-              float sizeHash = fract(sin(dot(gridPos, vec2(415.2, 371.9))) * 43758.5453);
-              float starSize = 0.05 + 0.1 * sizeHash;
+              float sizeHash = fract(sin(dot(gridPos + faceHash, vec2(415.2, 371.9))) * 43758.5453);
+              float starSize = 0.025 + 0.025 * sizeHash;
 
               stars = 1.0 - smoothstep(0.0, starSize, dist);
               stars = pow(stars, 4.0);
