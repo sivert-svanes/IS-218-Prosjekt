@@ -1,8 +1,5 @@
 ﻿/**
- * MapLibre GL JS Stars Custom Layer (TypeScript)
- *
- * Adds a procedural starry background to globe projection views using a custom layer.
- * Stars are generated in a fragment shader and properly rotate with the globe camera.
+ * Heavily based on https://github.com/birkskyum/maplibre-gl-stars/tree/main
  */
 
 export interface StarsLayerOptions {

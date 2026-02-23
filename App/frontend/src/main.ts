@@ -48,7 +48,7 @@ if (!maplibregl) {
 
   map.on('style.load', () => {
     map.setProjection({
-      type: 'globe',
+      type: 'globe' as string,
     });
 
     // Stars layer
@@ -56,8 +56,8 @@ if (!maplibregl) {
       try {
         const starsLayer = createStarsLayer({
           id: 'stars',
-          intensity: 1.0,
-          density: 0.15,
+          intensity: 1.0 as number,
+          density: 0.55 as number,
         });
         if (!map.getLayer('stars')) {
           const layers : LayerSpecification[] = map.getStyle().layers;
