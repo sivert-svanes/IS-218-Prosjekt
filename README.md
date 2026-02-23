@@ -7,6 +7,8 @@ A verry nice little project to do stuff and be a good person.
   - Typescript
   - MaplibreGL-gl-js
 - Flask
+- SQLAlchemy
+- GeoAlchemy2
 
 ## 2. Setup
 
@@ -19,6 +21,8 @@ A verry nice little project to do stuff and be a good person.
 > <details>
 > <summary style="font-size: 14px; font-weight: bold">1. Using build.py </summary>
 > 1. In root directory run build.py
+> 
+> Use this unless it breaks (It likes to break, and never in the same way)
 >
 >    ```powershell
 >     python build.py
@@ -60,11 +64,34 @@ A verry nice little project to do stuff and be a good person.
 >               ```powershell
 >               pip install Flask
 >               ```
-> 3. Start server, from root folder
->     ```powershell
+> 3. Setup envorinment variables
+>     1. In the root folder create a .env file, e.g.:
+>         ```bash
+>         touch .env
+>         ```
+>         ```powershell
+>         echo > .env
+>         ```
+>     2. Add the following line to the .env file
+>         ```bash
+>         DATABASE_URL=[DATABASECONNECTIONSTRING]
+>         ```
+>        
+> 4. Start server, from root folder
+>   ```powershell
 >     flask --app .\App\app.py run --debug
 >     ```
 > </details>
+
+## 3. Data sources
+
+| Description  | Format  | Modifications    | Source                                                                                                                  |
+|--------------|---------|------------------|-------------------------------------------------------------------------------------------------------------------------|
+| Map style    | JSON    | Globe projection | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           |
+| Counties     | GeoJson | -> PostGIS       | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) |
+| Firestations | GML     | -> PostGIS       | [GeoNorge](https://kartkatalog.geonorge.no/metadata/brannstasjoner/0ccce81d-a72e-46ca-8bd9-57b362376485)                |
+
+
 
     
     
