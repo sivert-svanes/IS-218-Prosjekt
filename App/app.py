@@ -1,14 +1,18 @@
-from flask import Flask, render_template
-
-app = Flask(__name__)
-# Disable static file cache during development so the browser doesn't get 304 Not Modified
-app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
-
+import flask
+from App import app, database
 
 @app.route('/')
 def hello_world():
+    return flask.render_template('index.html')
 
-    return render_template('index.html')
+@app.route('/api/brannstasjoner')
+def api_brannstasjoner():
+    engine = database.create_engine()
+    geojson = database.get_brannstasjoner(engine)
+    return flask.jsonify(geojson)
 
-if __name__ == '__main__':
-    app.run()
+@app.route('/api/fylke/<int:fylke_id>')
+def api_fylke(fylke_id):
+    engine = database.create_engine()
+    geojson = database.get_brannstasjoner_within_fylke(engine, fylke_id)
+    return flask.jsonify(geojson)

@@ -1,4 +1,4 @@
-﻿{
+{
   "name": "is-218-frontend",
   "version": "0.1.0",
   "private": true,
@@ -7,7 +7,7 @@
     "watch": "tsc -w -p ."
   },
   "dependencies": {
-    "maplibre-gl": "^2.4.0"
+    "maplibre-gl": "^4.7.1"
   },
   "devDependencies": {
     "typescript": "^4.9.5"

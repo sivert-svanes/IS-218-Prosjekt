@@ -2,16 +2,26 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Title</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='/style/style.css')}}" onerror="href='../static/style/style.css';">
+  <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+  <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
 </head>
-<body>
-<div id="map" style="height: 100dvh; width: 100dvw;"></div>
 
-<!-- Load MapLibre CDN first (provides global `maplibregl`) -->
-<script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
-<link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
-
-<!-- Load compiled frontend script as a module (generated from TypeScript) -->
-<script type="module" src="{{ url_for('static', filename='js/main.js') }}?v={{ ts }}"></script>
+<body style="margin: 0;">
+  <div id="map" style="height: 100dvh; width: 100dvw;"></div>
+  <div class="map-overlay container">
+    <div class="header box prevent-select">Map Application</div>
+    <div class="dropdown">
+      <div class="box text prevent-select button dropdown-toggle" id="layers-toggle">Layers ▾</div>
+    </div>
+    <div class="box text prevent-select button">Controls</div>
+  </div>
+  <!-- Dropdown menu lives outside .map-overlay so backdrop-filter works against the map -->
+  <div class="dropdown-menu" id="layers-menu"></div>
+  <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v={{ ts }}"
+        onerror="let s=document.createElement('script');s.type='module';s.src='../static/js/main.js';document.body.appendChild(s);">
+  </script>
 </body>
 </html>
