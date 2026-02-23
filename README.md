@@ -61,7 +61,7 @@ A verry nice little project to do stuff and be a good person.
 >               pip install Flask
 >               ```
 > 3. Start server, from root folder
->   ```powershell
+>     ```powershell
 >     flask --app .\App\app.py run --debug
 >     ```
 > </details>
