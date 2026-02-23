@@ -168,10 +168,7 @@ function onEscape(e: KeyboardEvent): void {
 /** The Konami Code sequence */
 const KONAMI = [
   'ArrowUp', 'ArrowUp',
-  'ArrowDown', 'ArrowDown',
-  'ArrowLeft', 'ArrowRight',
-  'ArrowLeft', 'ArrowRight',
-  'b', 'a',
+  'ArrowDown', 'ArrowDown'
 ];
 
 let konamiIndex = 0;
