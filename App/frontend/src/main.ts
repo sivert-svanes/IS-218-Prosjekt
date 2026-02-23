@@ -6,6 +6,7 @@ import {
   LngLatLike,
   PropertyValueSpecification
 } from "maplibre-gl";
+import { registerKonamiCode } from './middleEarth.js';
 
 
 declare global {
@@ -30,6 +31,9 @@ if (!maplibregl) {
   });
 
   window.map = map;
+
+  // 🧙 Easter egg: type the Konami Code (↑↑↓↓←→←→BA) to enter Middle-earth mode
+  registerKonamiCode(map);
 
   const layersToggle = document.getElementById('layers-toggle');
   const layersMenu   = document.getElementById('layers-menu');

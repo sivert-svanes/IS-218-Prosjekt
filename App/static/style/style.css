@@ -1,4 +1,4 @@
-﻿.map-overlay {
+﻿﻿.map-overlay {
     position: absolute;
     top: 0;
     right: auto;
@@ -148,3 +148,77 @@
     color: rgba(194, 200, 202, 0.5);
     font-style: italic;
 }
+
+/* ── Middle-earth Easter Egg Banner ───────────────────────────────────────── */
+#me-banner {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    pointer-events: none;
+    animation: me-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+#me-banner.me-fade-out {
+    animation: me-sink 0.6s ease-in forwards;
+}
+
+.me-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    background: rgba(10, 7, 4, 0.88);
+    border: 1px solid rgba(212, 175, 55, 0.55);
+    border-radius: 8px;
+    padding: 1rem 2rem 0.85rem;
+    box-shadow: 0 0 32px rgba(212, 175, 55, 0.3), 0 8px 24px rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px);
+    white-space: nowrap;
+}
+
+.me-rune {
+    font-size: 2rem;
+    animation: me-spin 3s linear infinite;
+}
+
+.me-title {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.1rem;
+    font-weight: bold;
+    letter-spacing: 0.18em;
+    color: #d4af37;
+    text-shadow: 0 0 12px rgba(212, 175, 55, 0.8);
+}
+
+.me-subtitle {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 0.78rem;
+    color: rgba(212, 175, 55, 0.6);
+    letter-spacing: 0.06em;
+}
+
+.me-subtitle kbd {
+    background: rgba(212, 175, 55, 0.15);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 3px;
+    padding: 0 4px;
+    font-size: 0.75rem;
+}
+
+@keyframes me-rise {
+    from { opacity: 0; transform: translateX(-50%) translateY(1.5rem); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes me-sink {
+    from { opacity: 1; transform: translateX(-50%) translateY(0); }
+    to   { opacity: 0; transform: translateX(-50%) translateY(1.5rem); }
+}
+
+@keyframes me-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+
