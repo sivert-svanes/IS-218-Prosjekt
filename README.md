@@ -103,5 +103,7 @@ A verry nice little project to do stuff and be a good person.
 - Refleksjon: Diskuter kort forbedringspunkter ved din nåværende løsning (4-5 setninger / punkter) 
 
 ## 4. Arkitekturskisse
-![](C:\Users\siver\Downloads\Arkitekturskisse.png)
+<img width="722" height="912" alt="Arkitekturskisse(2)" src="https://github.com/user-attachments/assets/10ae8510-8e08-4c8c-8987-cc83ab4ec3df" />
+
+
 ![Jork IT](https://media1.tenor.com/m/grh1asJHzg4AAAAC/freaky.gif)
