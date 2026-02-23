@@ -4,7 +4,6 @@ import {
   AddLayerObject,
   LayerSpecification,
   LngLatLike,
-  MapGeoJSONFeature,
   PropertyValueSpecification
 } from "maplibre-gl";
 
@@ -32,6 +31,62 @@ if (!maplibregl) {
 
   window.map = map;
 
+  // ── Layer-toggle dropdown ──────────────────────────────────────
+  const layersToggle = document.getElementById('layers-toggle');
+  const layersMenu   = document.getElementById('layers-menu');
+
+  // Open / close the dropdown when clicking the toggle button
+  layersToggle?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    layersMenu?.classList.toggle('open');
+    // Align the fixed menu with the toggle button
+    if (layersMenu?.classList.contains('open') && layersToggle) {
+      const rect = layersToggle.getBoundingClientRect();
+      layersMenu.style.top = (rect.bottom + 16) + 'px';
+      layersMenu.style.left = rect.left + 'px';
+    }
+  });
+  // Close when clicking anywhere else on the page
+  document.addEventListener('click', () => {
+    layersMenu?.classList.remove('open');
+  });
+  // Prevent clicks inside the menu from closing it
+  layersMenu?.addEventListener('click', (e) => e.stopPropagation());
+
+  /**
+   * Register a map layer in the Layers dropdown so the user can toggle it.
+   *
+   * @param layerId   – The MapLibre layer id to toggle visibility for.
+   * @param label     – Human-readable label shown in the menu.
+   * @param visible   – Whether the layer starts visible (default true).
+   */
+  function registerLayer(layerId: string, label: string, visible: boolean = true) {
+    if (!layersMenu) return;
+
+    // Remove the "no layers" placeholder if present
+    const empty = layersMenu.querySelector('.dropdown-empty');
+    if (empty) empty.remove();
+
+    const item = document.createElement('label');
+    item.className = 'dropdown-item prevent-select';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = visible;
+
+    cb.addEventListener('change', () => {
+      map.setLayoutProperty(layerId, 'visibility', cb.checked ? 'visible' : 'none');
+    });
+
+    const span = document.createElement('span');
+    span.textContent = label;
+
+    item.appendChild(cb);
+    item.appendChild(span);
+    layersMenu.appendChild(item);
+  }
+  // ───────────────────────────────────────────────────────────────
+
   const geolocate = new maplibregl.GeolocateControl({
     positionOptions: { enableHighAccuracy: true as boolean },
     trackUserLocation: true as boolean,
@@ -51,6 +106,7 @@ if (!maplibregl) {
 
   const scale = new maplibregl.ScaleControl({ maxWidth: 320, unit: 'metric' });
   map.addControl(scale, 'bottom-left');
+
 
   map.on('style.load', () => {
     map.setProjection({
@@ -205,17 +261,12 @@ if (!maplibregl) {
         ]);
       }
     }
-  });
 
-
-    // Fetch brannstasjoner GeoJSON and add as a layer
+    // Fetch brannstasjoner and add as a layer
     fetch('/api/brannstasjoner')
       .then(res => res.json())
       .then((geojson) => {
-        map.addSource('brannstasjoner', {
-          type: 'geojson',
-          data: geojson,
-        });
+        map.addSource('brannstasjoner', { type: 'geojson', data: geojson });
 
         map.addLayer({
           id: 'brannstasjoner-circle' as string,
@@ -229,50 +280,35 @@ if (!maplibregl) {
           },
         });
 
-        // Show popup on click for each brannstasjon marker
+        registerLayer('brannstasjoner-circle', 'Brannstasjoner', true);
+
         map.on('click', 'brannstasjoner-circle', (e) => {
           if (!e.features || e.features.length === 0) return;
-
-          const feature: MapGeoJSONFeature = e.features[0];
+          const feature = e.features[0];
           const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
-          const props : {[name: string]: string;} = feature.properties || {};
-
-          // Build popup HTML from available properties
-          const name : string = props.brannstasjon || 'Ukjent stasjon';
-          const brannvesen : string = props.brannvesen || '';
-          const stasjonstype : string = props.stasjonstype || '';
-          const kasernert : string = props.kasernert || '';
-          const lon : string = coords[0].toFixed(6);
-          const lat : string = coords[1].toFixed(6);
+          const props = feature.properties || {} as Record<string, string>;
 
           const html = `
             <div style="font-family: sans-serif; max-width: 260px;">
-              <h3 style="margin: 0 0 6px 0; font-size: 14px;">${name}</h3>
-              ${brannvesen ? `<p style="margin: 2px 0;"><strong>Brannvesen:</strong> ${brannvesen}</p>` : ''}
-              ${stasjonstype ? `<p style="margin: 2px 0;"><strong>Stasjonstype:</strong> ${stasjonstype}</p>` : ''}
-              ${kasernert ? `<p style="margin: 2px 0;"><strong>Kasernert:</strong> ${kasernert}</p>` : ''}
-              <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${lat}, ${lon}</p>
-            </div>
-          `;
+              <h3 style="margin: 0 0 6px 0; font-size: 14px;">${props.brannstasjon || 'Ukjent stasjon'}</h3>
+              ${props.brannvesen ? `<p style="margin: 2px 0;"><strong>Brannvesen:</strong> ${props.brannvesen}</p>` : ''}
+              ${props.stasjonstype ? `<p style="margin: 2px 0;"><strong>Stasjonstype:</strong> ${props.stasjonstype}</p>` : ''}
+              ${props.kasernert ? `<p style="margin: 2px 0;"><strong>Kasernert:</strong> ${props.kasernert}</p>` : ''}
+              <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
+            </div>`;
 
-          // Ensure the popup appears over the correct copy of the feature if the map is zoomed out and wrapped
           while (Math.abs(e.lngLat.lng - coords[0]) > 180) {
             coords[0] += e.lngLat.lng > coords[0] ? 360 : -360;
           }
 
-          new maplibregl.Popup({ offset: 10 })
-            .setLngLat(coords)
-            .setHTML(html)
-            .addTo(map);
+          new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
         });
 
-        // Use pointer cursor for markers
-        map.on('mouseenter', 'brannstasjoner-circle', () => {
-          map.getCanvas().style.cursor = 'pointer';
-        });
-        map.on('mouseleave', 'brannstasjoner-circle', () => {
-          map.getCanvas().style.cursor = '';
-        });
+        map.on('mouseenter', 'brannstasjoner-circle', () => { map.getCanvas().style.cursor = 'pointer'; });
+        map.on('mouseleave', 'brannstasjoner-circle', () => { map.getCanvas().style.cursor = ''; });
       })
       .catch(err => console.error('Failed to load brannstasjoner:', err));
+
+  }); // end style.load
+
 }
