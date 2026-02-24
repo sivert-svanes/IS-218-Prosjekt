@@ -1,5 +1,4 @@
 import type * as MaplibreGL from "maplibre-gl";
-
 declare global {
   interface Window {
     // The global injected by the CDN; optional because it may not be present in some environments
@@ -9,6 +8,7 @@ declare global {
   }
 }
 
+const maplibregl = window.maplibregl;
 const layersToggle = document.getElementById('layers-toggle');
 const layersMenu   = document.getElementById('layers-menu');
 
@@ -41,7 +41,8 @@ layersMenu?.addEventListener('click', (e) => e.stopPropagation());
  * @param visible Whether the layer starts visible (default true).
  * @param map The map to add the layer to
  */
-export function registerLayer(layerId: string, label: string, visible: boolean = true, map: MaplibreGL.Map) {
+
+function registerLayer(layerId: string, label: string, visible: boolean = true, map: MaplibreGL.Map) {
   if (!layersMenu) return;
 
   // Remove the "no layers" placeholder if present
@@ -67,3 +68,70 @@ export function registerLayer(layerId: string, label: string, visible: boolean =
   layersMenu.appendChild(item);
 }
 
+/**
+ * Gets firestations from db api, and adds layer for each conty
+ * @param map The map the layers are added to
+ * @param fylkeIds The ids of the counties to request
+ */
+export async function AddFireStationLayerGeospatial(map: MaplibreGL.Map, fylkeIds: number[]):Promise<void> {
+  for (const fylkeId of fylkeIds) {
+    try {
+      const res = await fetch(`/api/fylke/${fylkeId}`);
+      const geojson = await res.json();
+
+      const sourceId = `brannstasjoner-fylke-${fylkeId}`;
+      const layerId = `brannstasjoner-circle-${fylkeId}`;
+      const fylkeNavn = geojson.fylke_navn || `Fylke ${fylkeId}`;
+
+      map.addSource(sourceId, { type: 'geojson', data: geojson });
+
+      map.addLayer({
+        id: layerId,
+        type: 'circle',
+        source: sourceId,
+        paint: {
+          'circle-radius': 6,
+          'circle-color': '#e74c3c',
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#ffffff',
+        },
+      });
+
+      registerLayer(layerId, `Brannstasjoner Fylke ${fylkeNavn}`, true, map);
+
+      // Add event listeners (same as before)
+      map.on('click', layerId, (e) => {
+        if (!e.features || e.features.length === 0) return;
+        const feature = e.features[0];
+        const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
+        const props = feature.properties || {} as Record<string, string>;
+
+        const html = `
+          <div style="font-family: sans-serif; max-width: 260px;">
+            <h3 style="margin: 0 0 6px 0; font-size: 14px;">${props.brannstasjon || 'Ukjent stasjon'}</h3>
+            ${props.brannvesen ? `<p style="margin: 2px 0;"><strong>Brannvesen:</strong> ${props.brannvesen}</p>` : ''}
+            ${props.stasjonstype ? `<p style="margin: 2px 0;"><strong>Stasjonstype:</strong> ${props.stasjonstype}</p>` : ''}
+            ${props.kasernert ? `<p style="margin: 2px 0;"><strong>Kasernert:</strong> ${props.kasernert}</p>` : ''}
+            <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
+          </div>`;
+
+        while (Math.abs(e.lngLat.lng - coords[0]) > 180) {
+          coords[0] += e.lngLat.lng > coords[0] ? 360 : -360;
+        }
+
+        if (maplibregl) {
+          new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
+        }
+      });
+
+      map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+
+      // Optional: add a small delay between requests
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+    } catch (err) {
+      console.error(`Failed to load brannstasjoner for fylke ${fylkeId}:`, err);
+    }
+  }
+}

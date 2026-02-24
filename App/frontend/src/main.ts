@@ -1,5 +1,4 @@
-﻿// Use the global provided by the CDN instead of importing a node-style package
-import type * as MaplibreGL from 'maplibre-gl';
+﻿import type * as MaplibreGL from 'maplibre-gl';
 import {
   AddLayerObject,
   LayerSpecification,
@@ -7,8 +6,7 @@ import {
   PropertyValueSpecification
 } from "maplibre-gl";
 import { registerKonamiCode } from './middleEarth.js';
-import {registerLayer} from './layer.js'
-
+import {AddFireStationLayerGeospatial} from './layer.js'
 
 declare global {
   interface Window {
@@ -33,10 +31,6 @@ if (!maplibregl) {
 
   window.map = map;
   registerKonamiCode(map);
-
-
-
-
 
   const geolocate = new maplibregl.GeolocateControl({
     positionOptions: { enableHighAccuracy: true as boolean },
@@ -212,70 +206,7 @@ if (!maplibregl) {
         ]);
       }
     }
-
-    async function loadFylkerSequentially() {
-  const fylkeIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-
-  for (const fylkeId of fylkeIds) {
-    try {
-      const res = await fetch(`/api/fylke/${fylkeId}`);
-      const geojson = await res.json();
-
-      const sourceId = `brannstasjoner-fylke-${fylkeId}`;
-      const layerId = `brannstasjoner-circle-${fylkeId}`;
-      const fylkeNavn = geojson.fylke_navn || `Fylke ${fylkeId}`;
-
-      map.addSource(sourceId, { type: 'geojson', data: geojson });
-
-      map.addLayer({
-        id: layerId,
-        type: 'circle',
-        source: sourceId,
-        paint: {
-          'circle-radius': 6,
-          'circle-color': '#e74c3c',
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#ffffff',
-        },
-      });
-
-      registerLayer(layerId, `Brannstasjoner Fylke ${fylkeNavn}`, true, map);
-
-      // Add event listeners (same as before)
-      map.on('click', layerId, (e) => {
-        if (!e.features || e.features.length === 0) return;
-        const feature = e.features[0];
-        const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
-        const props = feature.properties || {} as Record<string, string>;
-
-        const html = `
-          <div style="font-family: sans-serif; max-width: 260px;">
-            <h3 style="margin: 0 0 6px 0; font-size: 14px;">${props.brannstasjon || 'Ukjent stasjon'}</h3>
-            ${props.brannvesen ? `<p style="margin: 2px 0;"><strong>Brannvesen:</strong> ${props.brannvesen}</p>` : ''}
-            ${props.stasjonstype ? `<p style="margin: 2px 0;"><strong>Stasjonstype:</strong> ${props.stasjonstype}</p>` : ''}
-            ${props.kasernert ? `<p style="margin: 2px 0;"><strong>Kasernert:</strong> ${props.kasernert}</p>` : ''}
-            <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
-          </div>`;
-
-        while (Math.abs(e.lngLat.lng - coords[0]) > 180) {
-          coords[0] += e.lngLat.lng > coords[0] ? 360 : -360;
-        }
-
-        new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
-      });
-
-      map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
-
-      // Optional: add a small delay between requests
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-    } catch (err) {
-      console.error(`Failed to load brannstasjoner for fylke ${fylkeId}:`, err);
-    }
+    const fylkeIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    AddFireStationLayerGeospatial(map, fylkeIds);
   }
-}
-
-loadFylkerSequentially();
-
-})}
+)}
