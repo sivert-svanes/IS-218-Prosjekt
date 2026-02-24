@@ -25,8 +25,8 @@ if (!maplibregl) {
   const map = new maplibregl.Map({
     container: 'map' as string,
     style: '../static/style/mapstyle.json' as string,
-    center: [0, 0] as LngLatLike,
-    zoom: 6 as number,
+    center: [8.0, 59.0] as LngLatLike,
+    zoom: 2 as number,
   });
 
   window.map = map;
