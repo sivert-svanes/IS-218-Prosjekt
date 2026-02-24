@@ -1,20 +1,32 @@
-﻿.map-overlay {
-    position: absolute;
+﻿﻿html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+}
+
+#map {
+    position: fixed !important;
     top: 0;
-    right: auto;
-    background: rgba(15,25,30,0.65);
+    left: 0;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 0;
+}
+
+.map-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    background: rgba(15,25,30,0.82);
     color: #fff;
     padding: 4px;
     border-bottom-right-radius: 6px;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
     font-size: 12px;
-    z-index: 100;
+    z-index: 9999;
     pointer-events: auto;
-    width: 75vmax;
-    max-width: 75vw;
     box-shadow: 0 4px 12px rgba(15,25,30,0.35);
-    backdrop-filter: blur(0.1rem);
-    will-change: backdrop-filter;
     outline: 2px solid rgba(15,25,30,0.65);
 }
 
@@ -91,11 +103,11 @@
 
 .dropdown-menu {
     display: flex;
+    flex-direction: column;
     position: fixed;
     box-sizing: border-box;
     min-width: 180px;
-    z-index: 100;
-    flex-direction: column;
+    z-index: 9999;
     background: rgba(15,25,30,0.65);
     outline: 2px solid rgba(15,25,30,0.65);
     box-shadow: 0 4px 12px rgba(15,25,30,0.35);
@@ -148,3 +160,72 @@
     color: rgba(194, 200, 202, 0.5);
     font-style: italic;
 }
+
+/* ── Middle-earth Easter Egg Banner ───────────────────────────────────────── */
+#me-banner {
+    position: fixed;
+    bottom: 2rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 9999;
+    pointer-events: none;
+    animation: me-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+#me-banner.me-fade-out {
+    animation: me-sink 0.6s ease-in forwards;
+}
+
+.me-inner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.3rem;
+    background: rgba(10, 7, 4, 0.88);
+    border: 1px solid rgba(212, 175, 55, 0.55);
+    border-radius: 8px;
+    padding: 1rem 2rem 0.85rem;
+    box-shadow: 0 0 32px rgba(212, 175, 55, 0.3), 0 8px 24px rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px);
+    white-space: nowrap;
+}
+
+.me-rune {
+    font-size: 2rem;
+}
+
+.me-title {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.1rem;
+    font-weight: bold;
+    letter-spacing: 0.18em;
+    color: #d4af37;
+    text-shadow: 0 0 12px rgba(212, 175, 55, 0.8);
+}
+
+.me-subtitle {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 0.78rem;
+    color: rgba(212, 175, 55, 0.6);
+    letter-spacing: 0.06em;
+}
+
+.me-subtitle kbd {
+    background: rgba(212, 175, 55, 0.15);
+    border: 1px solid rgba(212, 175, 55, 0.35);
+    border-radius: 3px;
+    padding: 0 4px;
+    font-size: 0.75rem;
+}
+
+@keyframes me-rise {
+    from { opacity: 0; transform: translateX(-50%) translateY(1.5rem); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+@keyframes me-sink {
+    from { opacity: 1; transform: translateX(-50%) translateY(0); }
+    to   { opacity: 0; transform: translateX(-50%) translateY(1.5rem); }
+}
+
+
