@@ -42,7 +42,7 @@ layersMenu?.addEventListener('click', (e) => e.stopPropagation());
  * @param map The map to add the layer to
  */
 
-function registerLayer(layerId: string, label: string, visible: boolean = true, map: MaplibreGL.Map) {
+function registerLayer(layerId: string, label: string, visible: boolean, map: MaplibreGL.Map) {
   if (!layersMenu) return;
 
   // Remove the "no layers" placeholder if present
@@ -69,11 +69,24 @@ function registerLayer(layerId: string, label: string, visible: boolean = true, 
 }
 
 /**
- * Gets firestations from db api, and adds layer for each conty
+ * Gets firestations from db api, and adds layer for each county
  * @param map The map the layers are added to
  * @param fylkeIds The ids of the counties to request
+ * @param visible Controls if the layer is displayed once it's been loaded
  */
-export async function AddFireStationLayerGeospatial(map: MaplibreGL.Map, fylkeIds: number[]):Promise<void> {
+export async function AddFireStationLayerGeospatial(map: MaplibreGL.Map, fylkeIds: number[], visible: boolean=false):Promise<void> {
+  enum visibility{
+    'none' = 0,
+    'visible' = 1
+  }
+
+  let LayerVisibility : any  = visibility[visibility.none];
+
+  if (visible)
+  {
+    LayerVisibility = visibility[visibility.visible]
+  }
+
   for (const fylkeId of fylkeIds) {
     try {
       const res = await fetch(`/api/fylke/${fylkeId}`);
@@ -94,10 +107,12 @@ export async function AddFireStationLayerGeospatial(map: MaplibreGL.Map, fylkeId
           'circle-color': '#e74c3c',
           'circle-stroke-width': 1,
           'circle-stroke-color': '#ffffff',
-        },
+        },layout: {
+          visibility: LayerVisibility
+        }
       });
 
-      registerLayer(layerId, `Brannstasjoner Fylke ${fylkeNavn}`, true, map);
+      registerLayer(layerId, `Brannstasjoner Fylke ${fylkeNavn}`, visible, map);
 
       // Add event listeners (same as before)
       map.on('click', layerId, (e) => {
