@@ -192,7 +192,6 @@
 
 .me-rune {
     font-size: 2rem;
-    animation: me-spin 3s linear infinite;
 }
 
 .me-title {
@@ -229,8 +228,4 @@
     to   { opacity: 0; transform: translateX(-50%) translateY(1.5rem); }
 }
 
-@keyframes me-spin {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
-}
 

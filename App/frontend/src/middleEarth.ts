@@ -1,54 +1,23 @@
 ﻿/**
- * 🧙 Middle-earth Easter Egg
- *
- * Activated via the Konami Code: ↑ ↑ ↓ ↓ ← → ← → B A
- *
- * Uses the publicly available ESRI Middle-earth vector tile service
- * rendered via MapLibre GL JS.
+ * Middle-earth Mode for Maplibre GL JS
+ * Konami Code: gandalf
  */
 import type * as MaplibreGL from 'maplibre-gl';
 
-/** Middle-earth style using ESRI's public Middle-earth map tiles */
-const MIDDLE_EARTH_STYLE: string =
-  'https://raw.githubusercontent.com/jjrom/lotr-map/main/lotr_mapstyle.json';
+const ME_SOURCE = 'middle-earth-source';
+const ME_LAYER  = 'middle-earth-layer';
+const ME_BG     = 'middle-earth-bg';
 
-/** Fallback: a hand-crafted raster-based style pointing at ESRI's Middle-earth tile service */
-function buildMiddleEarthRasterStyle(): object {
-  return {
-    version: 8,
-    name: 'Middle-earth',
-    sources: {
-      'middle-earth': {
-        type: 'raster',
-        tiles: [
-          'https://tiles.arcgis.com/tiles/P3ePLMYs2RVChkJx/arcgis/rest/services/Middle_earth_Imagery/MapServer/tile/{z}/{y}/{x}',
-        ],
-        tileSize: 256,
-        attribution: '© Esri, Middle-earth',
-        minzoom: 0,
-        maxzoom: 10,
-      },
-    },
-    layers: [
-      {
-        id: 'middle-earth-tiles',
-        type: 'raster',
-        source: 'middle-earth',
-        minzoom: 0,
-        maxzoom: 22,
-      },
-    ],
-  };
-}
+// ESRI Middle-earth tile service – note ESRI uses {z}/{y}/{x} row/col order
+const ME_TILE_URL =
+  'https://tiles.arcgis.com/tiles/CBiB2HwHGXUi8D4Y/arcgis/rest/services/Middle_Earth_Overlay_Map/MapServer/tile/{z}/{y}/{x}';
 
 let isActive = false;
-let savedStyle: string | object | null = null;
 let savedCenter: [number, number] | null = null;
 let savedZoom: number | null = null;
-let savedProjection: string | null = null;
+let savedLayerVisibility: Map<string, string> = new Map();
 let banner: HTMLElement | null = null;
 
-/** Create and show the "You have found the One Map" banner */
 function showBanner(): void {
   if (banner) return;
   banner = document.createElement('div');
@@ -68,7 +37,7 @@ function showBanner(): void {
   }, 4000);
 }
 
-/** Remove the banner if still visible */
+// Remove the banner if still visible
 function hideBanner(): void {
   banner?.remove();
   banner = null;
@@ -78,81 +47,73 @@ export function isMiddleEarthActive(): boolean {
   return isActive;
 }
 
-/**
- * Activate Middle-earth mode.
- * Saves the current map state, then swaps in the ME style + flies to Middle-earth.
- */
 export async function activateMiddleEarth(map: MaplibreGL.Map): Promise<void> {
   if (isActive) return;
   isActive = true;
 
-  // Save current state
   const center = map.getCenter();
   savedCenter = [center.lng, center.lat];
-  savedZoom = map.getZoom();
-  savedProjection = 'globe'; // default projection used by this app
-  savedStyle = map.getStyle();
+  savedZoom   = map.getZoom();
 
   showBanner();
 
-  // Swap style – try the community GeoJSON-based style first, fall back to ESRI raster
-  try {
-    await new Promise<void>((resolve, reject) => {
-      // Listen for style.load ONCE
-      const onLoaded = () => { map.off('style.load', onLoaded); resolve(); };
-      const onError = (e: any) => { map.off('error', onError); reject(e); };
-      map.once('style.load', onLoaded);
-      map.once('error', onError);
-      map.setStyle(MIDDLE_EARTH_STYLE);
-    });
-  } catch {
-    console.warn('[ME] Community style failed, falling back to ESRI raster tiles.');
-    await new Promise<void>((resolve) => {
-      map.once('style.load', () => resolve());
-      map.setStyle(buildMiddleEarthRasterStyle() as any);
-    });
+  // Hide all existing layers, saving their visibility
+  savedLayerVisibility.clear();
+  for (const layer of map.getStyle().layers) {
+    const vis = (map.getLayoutProperty(layer.id, 'visibility') as string) ?? 'visible';
+    savedLayerVisibility.set(layer.id, vis);
+    map.setLayoutProperty(layer.id, 'visibility', 'none');
   }
 
-  // Turn off globe projection – Middle-earth is flat (like Tolkien intended)
-  try {
-    map.setProjection({ type: 'mercator' } as any);
-  } catch { /* projection API may not be available */ }
+  if (!map.getLayer(ME_BG)) {
+    map.addLayer({ id: ME_BG, type: 'background', paint: { 'background-color': '#1a1008' } } as any);
+  }
 
-  // Fly to the centre of Middle-earth (Rohan/Gondor region in the image)
-  map.flyTo({
-    center: [0, 0],    // The tile service is centred on 0,0 by design
-    zoom: 3,
-    duration: 2500,
-    easing: (t) => t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t,
-  });
+  if (!map.getSource(ME_SOURCE)) {
+    map.addSource(ME_SOURCE, {
+      type: 'raster',
+      tiles: [ME_TILE_URL],
+      tileSize: 256,
+      attribution: '© Esri, Middle-earth',
+    });
+  }
+  if (!map.getLayer(ME_LAYER)) {
+    map.addLayer({ id: ME_LAYER, type: 'raster', source: ME_SOURCE } as any);
+  }
 
-  // Listen for Escape key to deactivate
+  map.setProjection({ type: 'mercator' } as any);
+
+  map.setMinZoom(2);
+  map.setMaxZoom(8);
+
+  map.flyTo({ center: [45, 52], zoom: 2.25});
   window.addEventListener('keydown', onEscape);
 }
 
-/**
- * Deactivate Middle-earth mode and restore the previous map state.
- */
 export async function deactivateMiddleEarth(map: MaplibreGL.Map): Promise<void> {
   if (!isActive) return;
   isActive = false;
   hideBanner();
   window.removeEventListener('keydown', onEscape);
 
-  if (!savedStyle) return;
+  if (map.getLayer(ME_LAYER)) map.removeLayer(ME_LAYER);
+  if (map.getLayer(ME_BG))    map.removeLayer(ME_BG);
+  if (map.getSource(ME_SOURCE)) map.removeSource(ME_SOURCE);
 
-  await new Promise<void>((resolve) => {
-    map.once('style.load', () => resolve());
-    map.setStyle(savedStyle as any);
-  });
+  // Restore globe projection and remove ME constraints
+  map.setProjection({ type: 'globe' } as any);
+  map.setMinZoom(0);
+  map.setMaxZoom(22);
 
-  if (savedProjection) {
-    try { map.setProjection({ type: savedProjection } as any); } catch { /* ignore */ }
+  // Restore all layer visibility
+  for (const [id, vis] of savedLayerVisibility) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, 'visibility', vis);
   }
+  savedLayerVisibility.clear();
 
   map.flyTo({
     center: savedCenter ?? [10, 60],
-    zoom: savedZoom ?? 6,
+    zoom:   savedZoom   ?? 6,
     duration: 2000,
   });
 }
@@ -167,16 +128,11 @@ function onEscape(e: KeyboardEvent): void {
 
 /** The Konami Code sequence */
 const KONAMI = [
-  'ArrowUp', 'ArrowUp',
-  'ArrowDown', 'ArrowDown'
+  'g', 'a', 'n', 'd', 'a', 'l', 'f',
 ];
 
 let konamiIndex = 0;
 
-/**
- * Register the Konami Code listener on the document.
- * Pass the map instance so it can be toggled when the code is entered.
- */
 export function registerKonamiCode(map: MaplibreGL.Map): void {
   _mapRef = map;
   document.addEventListener('keydown', (e: KeyboardEvent) => {
@@ -192,7 +148,6 @@ export function registerKonamiCode(map: MaplibreGL.Map): void {
         }
       }
     } else {
-      // Partial reset – if first key matches, keep it
       konamiIndex = e.key === KONAMI[0] ? 1 : 0;
     }
   });

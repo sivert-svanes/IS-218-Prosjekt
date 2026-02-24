@@ -31,8 +31,6 @@ if (!maplibregl) {
   });
 
   window.map = map;
-
-  // 🧙 Easter egg: type the Konami Code (↑↑↓↓←→←→BA) to enter Middle-earth mode
   registerKonamiCode(map);
 
   const layersToggle = document.getElementById('layers-toggle');
