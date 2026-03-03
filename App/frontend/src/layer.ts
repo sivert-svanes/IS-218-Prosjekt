@@ -12,6 +12,23 @@ const maplibregl = window.maplibregl;
 const layersToggle = document.getElementById('layers-toggle');
 const layersMenu   = document.getElementById('layers-menu');
 
+const DSB_WMS_BASE = 'https://ogc.dsb.no/wms.ashx';
+
+//DSB WMS layers from https://ogc.dsb.no/wms.ashx?SERVICE=WMS&REQUEST=GetCapabilities&version=1.3.0
+const DSB_WMS_LAYERS: { name: string; title: string }[] = [
+  { name: 'layer_183', title: 'Brannstasjoner' },
+  { name: 'layer_184', title: 'Brannstasjoner kasernering' },
+  { name: 'layer_179', title: 'Interkommunale brannvesen' },
+  { name: 'layer_186', title: '110-sentraler' },
+  { name: 'layer_189', title: '110-sentraldistrikter' },
+  { name: 'layer_190', title: 'Distriktskontor sivilforsvaret' },
+  { name: 'layer_185', title: 'Sivilforsvarsdistrikter' },
+  { name: 'layer_243', title: 'Seksjoneringsvegger' },
+  { name: 'layer_340', title: 'Offentlige tilfluktsrom' },
+  { name: 'layer_444', title: 'Nødnett dekning håndholdt' },
+  { name: 'layer_443', title: 'Nødnett dekning kjøretøymontert' },
+];
+
 // Open / close the dropdown when clicking the toggle button
 const overlay = document.querySelector('.map-overlay') as HTMLElement | null;
 layersToggle?.addEventListener('click', (e) => {
@@ -66,6 +83,46 @@ function registerLayer(layerId: string, label: string, visible: boolean, map: Ma
   item.appendChild(cb);
   item.appendChild(span);
   layersMenu.appendChild(item);
+}
+
+
+
+/**
+ * Adds all DSB WMS layers to the map as individual raster layers,
+ * each registered in the layers toggle dropdown.
+ * @param map The MapLibre map instance to add layers to
+ * @param visible Whether the layers start visible (default false)
+ */
+export function AddDSBWmsLayers(map: MaplibreGL.Map, visible: boolean = false): void {
+  const visibility = visible ? 'visible' : 'none';
+
+  for (const layer of DSB_WMS_LAYERS) {
+    const sourceId = `dsb-wms-${layer.name}`;
+    const layerId  = `dsb-wms-layer-${layer.name}`;
+
+    const tileUrl =
+      `${DSB_WMS_BASE}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
+      `&LAYERS=${layer.name}&STYLES=en` +
+      `&FORMAT=image/png&TRANSPARENT=true` +
+      `&CRS=EPSG:3857` +
+      `&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`;
+
+    map.addSource(sourceId, {
+      type: 'raster',
+      tiles: [tileUrl],
+      tileSize: 256,
+    });
+
+    map.addLayer({
+      id: layerId,
+      type: 'raster',
+      source: sourceId,
+      paint: { 'raster-opacity': 0.85 },
+      layout: { visibility },
+    });
+
+    registerLayer(layerId, `DSB: ${layer.title}`, visible, map);
+  }
 }
 
 /**
