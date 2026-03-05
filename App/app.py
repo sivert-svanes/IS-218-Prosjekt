@@ -5,6 +5,7 @@ import hashlib
 import os
 import threading
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor
 from App import app, database
 
 DSB_WMS_CACHE_TTL = 60 * 60 * 24 * 7
@@ -18,13 +19,14 @@ PROXY_ALLOWED_URLS = {
 _cache_dir = os.path.join(os.path.dirname(__file__), '.tile_cache')
 # FanoutCache shards across 8 sub-caches, reducing SQLite lock contention
 # when multiple tiles are requested concurrently.
-tile_cache = diskcache.FanoutCache(_cache_dir, shards=8, size_limit=2 ** 30)
+tile_cache = diskcache.FanoutCache(_cache_dir, shards=8, size_limit=2 ** 33)
 
-# In-memory LRU cache sitting in front of the disk cache.
-# At ~40 KB avg per tile, 4096 entries ≈ 160 MB — covers a large browsed area.
 _MEM_CACHE_MAX = 4096
 _mem_cache: OrderedDict[str, tuple[bytes, str]] = OrderedDict()
-_mem_lock = threading.Lock()   # OrderedDict is not thread-safe on its own
+_mem_lock = threading.Lock()
+_executor = ThreadPoolExecutor(max_workers=8)
+_in_flight: dict[str, threading.Event] = {}
+_in_flight_lock = threading.Lock()
 
 def _mem_get(key: str):
     with _mem_lock:
@@ -42,6 +44,7 @@ def _mem_set(key: str, value: tuple[bytes, str]):
                 _mem_cache.popitem(last=False)
         _mem_cache[key] = value
 
+
 @app.route('/')
 def hello_world():
     return flask.render_template('index.html')
@@ -58,61 +61,56 @@ def api_fylke(fylke_id):
     geojson = database.get_shelters_within_fylke(engine, fylke_id)
     return flask.jsonify(geojson)
 
+def _tile_response(hit, label):
+    return flask.Response(hit[0], status=200, content_type=hit[1],
+                          headers={'X-Tile-Cache': label, 'Access-Control-Allow-Origin': '*'})
+
 @app.route('/api/wms-proxy')
 def wms_proxy():
-    """
-    Generic WMS proxy endpoint. Pass the upstream base URL via the `url`
-    query parameter; all other query parameters are forwarded as-is.
-    """
-    params = flask.request.args.to_dict(flat=False)
-    flat_params = {k: v[0] if len(v) == 1 else v for k, v in params.items()}
+    """Generic WMS proxy — pass upstream URL via `url` param, rest forwarded as-is.
+    Cache tiers: memory LRU → disk (FanoutCache) → upstream (deduplicated)."""
+    flat_params = dict(flask.request.args)
 
     upstream_url = flat_params.pop('url', None)
     if not upstream_url:
-        return flask.Response('Missing required "url" parameter', status=400)
+        return flask.Response('Missing "url" parameter', status=400)
     if upstream_url not in PROXY_ALLOWED_URLS:
-        return flask.Response(f'URL not in allowlist: {upstream_url}', status=403)
+        return flask.Response('URL not in allowlist', status=403)
 
-    # Stable cache key: hash of the upstream URL + sorted, normalised query string
     cache_key = hashlib.sha256(
         (upstream_url + '&' + '&'.join(f'{k}={v}' for k, v in sorted(flat_params.items()))).encode()
     ).hexdigest()
 
-    # 1. Memory cache (no disk I/O)
-    mem_hit = _mem_get(cache_key)
-    if mem_hit is not None:
-        content, content_type = mem_hit
-        return flask.Response(content, status=200, headers={
-            'Content-Type': content_type,
-            'X-Tile-Cache': 'MEM-HIT',
-            'Access-Control-Allow-Origin': '*',
-        })
+    hit = _mem_get(cache_key)
+    if hit: return _tile_response(hit, 'MEM-HIT')
 
-    # 2. Disk cache (persistent across restarts)
-    cached = tile_cache.get(cache_key)
-    if cached is not None:
-        content, content_type = cached
-        _mem_set(cache_key, (content, content_type))   # promote to memory
-        return flask.Response(content, status=200, headers={
-            'Content-Type': content_type,
-            'X-Tile-Cache': 'DISK-HIT',
-            'Access-Control-Allow-Origin': '*',
-        })
+    hit = tile_cache.get(cache_key)
+    if hit:
+        _mem_set(cache_key, hit)
+        return _tile_response(hit, 'DISK-HIT')
 
-    # 3. Upstream fetch
-    upstream = http_requests.get(upstream_url, params=flat_params, timeout=30)
+    # Deduplicate concurrent upstream fetches for the same tile
+    with _in_flight_lock:
+        is_leader = cache_key not in _in_flight
+        if is_leader:
+            _in_flight[cache_key] = threading.Event()
+        event = _in_flight[cache_key]
 
-    excluded_headers = {'content-encoding', 'transfer-encoding', 'connection'}
-    headers = {
-        k: v for k, v in upstream.headers.items()
-        if k.lower() not in excluded_headers
-    }
-    headers['Access-Control-Allow-Origin'] = '*'
-    headers['X-Tile-Cache'] = 'MISS'
+    if not is_leader:
+        event.wait(timeout=35)
+        hit = _mem_get(cache_key) or tile_cache.get(cache_key)
+        return _tile_response(hit, 'DEDUP-HIT') if hit else flask.Response('Upstream failed', status=502)
 
-    if upstream.status_code == 200:
-        content_type = upstream.headers.get('Content-Type', 'image/png')
-        tile_cache.set(cache_key, (upstream.content, content_type), expire=DSB_WMS_CACHE_TTL)
-        _mem_set(cache_key, (upstream.content, content_type))
-
-    return flask.Response(upstream.content, status=upstream.status_code, headers=headers)
+    try:
+        resp = http_requests.get(upstream_url, params=flat_params, timeout=30)
+        content_type = resp.headers.get('Content-Type', 'image/png')
+        if resp.status_code == 200:
+            hit = (resp.content, content_type)
+            _mem_set(cache_key, hit)
+            _executor.submit(tile_cache.set, cache_key, hit, DSB_WMS_CACHE_TTL)
+        return flask.Response(resp.content, status=resp.status_code, content_type=content_type,
+                              headers={'X-Tile-Cache': 'MISS', 'Access-Control-Allow-Origin': '*'})
+    finally:
+        with _in_flight_lock:
+            _in_flight.pop(cache_key, None)
+        event.set()
