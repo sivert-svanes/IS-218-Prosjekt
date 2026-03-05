@@ -29,7 +29,18 @@ const GEONORGE_VANN_LAYERS: { name: string; title: string }[] = [
   { name: 'Vassdrag', title: 'Vassdrag'   },
 ];
 
-//DSB WMS layers from https://ogc.dsb.no/wms.ashx?SERVICE=WMS&REQUEST=GetCapabilities&version=1.3.0
+const GEONORGE_FKB_VEI_LAYERS = [
+  'fkb_veg',
+  'fkb_vegavgrensning',
+  'fkb_vegavgrensning_sub',
+  'fkb_bru',
+  'fkb_vegbru',
+  'fkb_vegavgrensningbru',
+  'fkb_bane',
+  'fkb_baneitunnel',
+  'fkb_lufthavn',
+].join(',');
+
 const DSB_WMS_LAYERS: { name: string; title: string }[] = [
   { name: 'layer_444', title: 'Nødnett dekning håndholdt' },
   { name: 'layer_443', title: 'Nødnett dekning kjøretøymontert' },
@@ -165,6 +176,46 @@ export function AddVannOgVassdragLayers(map: MaplibreGL.Map, visible: boolean = 
 
     registerLayer(layerId, `Vann og vassdrag: ${layer.title}`, visible, map);
   }
+}
+
+/**
+ * Adds a single combined raster layer built from all FKB layers inside
+ * the "Vei" group of the Geonorge grunnkart WMS:
+ * fkb_veg, fkb_vegavgrensning, fkb_vegavgrensning_sub, fkb_bru,
+ * fkb_vegbru, fkb_vegavgrensningbru, fkb_bane, fkb_baneitunnel, fkb_lufthavn.
+ *
+ * All layers are passed as a comma-separated LAYERS value in a single WMS
+ * request so the server composites them and the frontend handles one source.
+ * @param map     The MapLibre map instance
+ * @param visible Whether the layer starts visible (default false)
+ */
+export function AddFKBVeiLayer(map: MaplibreGL.Map, visible: boolean = false): void {
+  const sourceId = 'geonorge-fkb-vei';
+  const layerId  = 'geonorge-fkb-vei-layer';
+  const visibility = visible ? 'visible' : 'none';
+
+  const tileUrl =
+    `${WMS_PROXY}?url=${encodeURIComponent(GEONORGE_GRUNNKART_BASE_URL)}&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
+    `&LAYERS=${encodeURIComponent(GEONORGE_FKB_VEI_LAYERS)}&STYLES=` +
+    `&FORMAT=image/png&TRANSPARENT=true` +
+    `&CRS=EPSG:3857` +
+    `&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`;
+
+  map.addSource(sourceId, {
+    type: 'raster',
+    tiles: [tileUrl],
+    tileSize: 256,
+  });
+
+  map.addLayer({
+    id: layerId,
+    type: 'raster',
+    source: sourceId,
+    paint: { 'raster-opacity': 0.9 },
+    layout: { visibility },
+  });
+
+  registerLayer(layerId, 'FKB Vei', visible, map);
 }
 
 /**
