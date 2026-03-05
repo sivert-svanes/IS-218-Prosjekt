@@ -6,7 +6,7 @@ import {
   PropertyValueSpecification
 } from "maplibre-gl";
 import { registerKonamiCode } from './middleEarth.js';
-import {AddFireStationLayerGeospatial, AddDSBWmsLayers} from './layer.js'
+import {AddShelterLayerGeospatial, AddDSBWmsLayers} from './layer.js'
 
 declare global {
   interface Window {
@@ -207,7 +207,7 @@ if (!maplibregl) {
       }
     }
     const fylkeIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-    AddFireStationLayerGeospatial(map, fylkeIds);
+    AddShelterLayerGeospatial(map, fylkeIds);
     AddDSBWmsLayers(map);
   }
 )}

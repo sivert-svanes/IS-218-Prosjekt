@@ -12,19 +12,15 @@ const maplibregl = window.maplibregl;
 const layersToggle = document.getElementById('layers-toggle');
 const layersMenu   = document.getElementById('layers-menu');
 
-const DSB_WMS_BASE = 'https://ogc.dsb.no/wms.ashx';
+/**
+ * Backend proxy base URL for DSB WMS tiles.
+ * Routing tiles through the backend allows future server-side raster analysis
+ * (e.g. classification, overlay computations) without changing the frontend.
+ */
+const DSB_WMS_PROXY = '/api/dsb-wms';
 
 //DSB WMS layers from https://ogc.dsb.no/wms.ashx?SERVICE=WMS&REQUEST=GetCapabilities&version=1.3.0
 const DSB_WMS_LAYERS: { name: string; title: string }[] = [
-  { name: 'layer_183', title: 'Brannstasjoner' },
-  { name: 'layer_184', title: 'Brannstasjoner kasernering' },
-  { name: 'layer_179', title: 'Interkommunale brannvesen' },
-  { name: 'layer_186', title: '110-sentraler' },
-  { name: 'layer_189', title: '110-sentraldistrikter' },
-  { name: 'layer_190', title: 'Distriktskontor sivilforsvaret' },
-  { name: 'layer_185', title: 'Sivilforsvarsdistrikter' },
-  { name: 'layer_243', title: 'Seksjoneringsvegger' },
-  { name: 'layer_340', title: 'Offentlige tilfluktsrom' },
   { name: 'layer_444', title: 'Nødnett dekning håndholdt' },
   { name: 'layer_443', title: 'Nødnett dekning kjøretøymontert' },
 ];
@@ -58,7 +54,6 @@ layersMenu?.addEventListener('click', (e) => e.stopPropagation());
  * @param visible Whether the layer starts visible (default true).
  * @param map The map to add the layer to
  */
-
 function registerLayer(layerId: string, label: string, visible: boolean, map: MaplibreGL.Map) {
   if (!layersMenu) return;
 
@@ -85,8 +80,6 @@ function registerLayer(layerId: string, label: string, visible: boolean, map: Ma
   layersMenu.appendChild(item);
 }
 
-
-
 /**
  * Adds all DSB WMS layers to the map as individual raster layers,
  * each registered in the layers toggle dropdown.
@@ -101,7 +94,7 @@ export function AddDSBWmsLayers(map: MaplibreGL.Map, visible: boolean = false): 
     const layerId  = `dsb-wms-layer-${layer.name}`;
 
     const tileUrl =
-      `${DSB_WMS_BASE}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
+      `${DSB_WMS_PROXY}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
       `&LAYERS=${layer.name}&STYLES=en` +
       `&FORMAT=image/png&TRANSPARENT=true` +
       `&CRS=EPSG:3857` +
@@ -126,31 +119,21 @@ export function AddDSBWmsLayers(map: MaplibreGL.Map, visible: boolean = false): 
 }
 
 /**
- * Gets firestations from db api, and adds layer for each county
+ * Fetches shelters from the API and adds a map layer for each county.
  * @param map The map the layers are added to
  * @param fylkeIds The ids of the counties to request
  * @param visible Controls if the layer is displayed once it's been loaded
  */
-export async function AddFireStationLayerGeospatial(map: MaplibreGL.Map, fylkeIds: number[], visible: boolean=false):Promise<void> {
-  enum visibility{
-    'none' = 0,
-    'visible' = 1
-  }
-
-  let LayerVisibility : any  = visibility[visibility.none];
-
-  if (visible)
-  {
-    LayerVisibility = visibility[visibility.visible]
-  }
+export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: number[], visible: boolean = false): Promise<void> {
+  const layerVisibility = visible ? 'visible' : 'none';
 
   for (const fylkeId of fylkeIds) {
     try {
       const res = await fetch(`/api/fylke/${fylkeId}`);
       const geojson = await res.json();
 
-      const sourceId = `brannstasjoner-fylke-${fylkeId}`;
-      const layerId = `brannstasjoner-circle-${fylkeId}`;
+      const sourceId = `shelters-fylke-${fylkeId}`;
+      const layerId  = `shelters-circle-${fylkeId}`;
       const fylkeNavn = geojson.fylke_navn || `Fylke ${fylkeId}`;
 
       map.addSource(sourceId, { type: 'geojson', data: geojson });
@@ -161,17 +144,15 @@ export async function AddFireStationLayerGeospatial(map: MaplibreGL.Map, fylkeId
         source: sourceId,
         paint: {
           'circle-radius': 6,
-          'circle-color': '#e74c3c',
+          'circle-color': '#3498db',
           'circle-stroke-width': 1,
           'circle-stroke-color': '#ffffff',
-        },layout: {
-          visibility: LayerVisibility
-        }
+        },
+        layout: { visibility: layerVisibility },
       });
 
-      registerLayer(layerId, `Brannstasjoner Fylke ${fylkeNavn}`, visible, map);
+      registerLayer(layerId, `Tilfluktsrom - ${fylkeNavn}`, visible, map);
 
-      // Add event listeners (same as before)
       map.on('click', layerId, (e) => {
         if (!e.features || e.features.length === 0) return;
         const feature = e.features[0];
@@ -180,10 +161,9 @@ export async function AddFireStationLayerGeospatial(map: MaplibreGL.Map, fylkeId
 
         const html = `
           <div style="font-family: sans-serif; max-width: 260px;">
-            <h3 style="margin: 0 0 6px 0; font-size: 14px;">${props.brannstasjon || 'Ukjent stasjon'}</h3>
-            ${props.brannvesen ? `<p style="margin: 2px 0;"><strong>Brannvesen:</strong> ${props.brannvesen}</p>` : ''}
-            ${props.stasjonstype ? `<p style="margin: 2px 0;"><strong>Stasjonstype:</strong> ${props.stasjonstype}</p>` : ''}
-            ${props.kasernert ? `<p style="margin: 2px 0;"><strong>Kasernert:</strong> ${props.kasernert}</p>` : ''}
+            <h3 style="margin: 0 0 6px 0; font-size: 14px;">Tilfluktsrom - ${props.romnr || 'Ukjent adresse'}</h3>
+            ${props.plasser ? `<p style="margin: 2px 0;"><strong>Kapasitet:</strong> ${props.plasser} personer</p>` : ''}
+            ${props.adresse ? `<p style="margin: 2px 0;"><strong>Adresse:</strong> ${props.adresse}</p>` : ''}
             <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
           </div>`;
 
@@ -199,11 +179,10 @@ export async function AddFireStationLayerGeospatial(map: MaplibreGL.Map, fylkeId
       map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
       map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
 
-      // Optional: add a small delay between requests
       await new Promise(resolve => setTimeout(resolve, 100));
 
     } catch (err) {
-      console.error(`Failed to load brannstasjoner for fylke ${fylkeId}:`, err);
+      console.error(`Failed to load shelters for fylke ${fylkeId}:`, err);
     }
   }
 }

@@ -43,7 +43,7 @@ def get_brannstasjoner(engine):
 
 
     #Der er 15 fylker å velge mellom. Fylke_id er en integer mellom 1 og 15, hvor 1 er Oslo og 15 er Troms og Finnmark.
-def get_brannstasjoner_within_fylke(engine, fylke_id):
+def get_shelters_within_fylke(engine, fylke_id):
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT json_build_object(
@@ -52,16 +52,16 @@ def get_brannstasjoner_within_fylke(engine, fylke_id):
                 'features', COALESCE(json_agg(
                     json_build_object(
                         'type', 'Feature',
-                        'geometry', ST_AsGeoJSON(geom)::json,
+                        'geometry', ST_AsGeoJSON(posisjon)::json,
                         'properties', to_jsonb(t.*) - 'geom'
                     )
                 ), '[]'::json)
             ) AS geojson
             FROM (
                 SELECT *
-                FROM public.brannstasjoner b
+                FROM public.shelters b
                 WHERE ST_Within(
-                    b.geom,
+                    b.posisjon,
                     (SELECT geomfylke FROM public.fylker WHERE id = :fylke_id)
                 )) t;
         """), {"fylke_id": fylke_id})
