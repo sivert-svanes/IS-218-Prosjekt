@@ -3,6 +3,8 @@ import requests as http_requests
 import diskcache
 import hashlib
 import os
+import threading
+from collections import OrderedDict
 from App import app, database
 
 DSB_WMS_CACHE_TTL = 60 * 60 * 24 * 7
@@ -14,7 +16,31 @@ PROXY_ALLOWED_URLS = {
 }
 
 _cache_dir = os.path.join(os.path.dirname(__file__), '.tile_cache')
-tile_cache = diskcache.Cache(_cache_dir, size_limit=2 ** 30)  # 1 GB max
+# FanoutCache shards across 8 sub-caches, reducing SQLite lock contention
+# when multiple tiles are requested concurrently.
+tile_cache = diskcache.FanoutCache(_cache_dir, shards=8, size_limit=2 ** 30)
+
+# In-memory LRU cache sitting in front of the disk cache.
+# At ~40 KB avg per tile, 4096 entries ≈ 160 MB — covers a large browsed area.
+_MEM_CACHE_MAX = 4096
+_mem_cache: OrderedDict[str, tuple[bytes, str]] = OrderedDict()
+_mem_lock = threading.Lock()   # OrderedDict is not thread-safe on its own
+
+def _mem_get(key: str):
+    with _mem_lock:
+        if key not in _mem_cache:
+            return None
+        _mem_cache.move_to_end(key)
+        return _mem_cache[key]
+
+def _mem_set(key: str, value: tuple[bytes, str]):
+    with _mem_lock:
+        if key in _mem_cache:
+            _mem_cache.move_to_end(key)
+        else:
+            if len(_mem_cache) >= _MEM_CACHE_MAX:
+                _mem_cache.popitem(last=False)
+        _mem_cache[key] = value
 
 @app.route('/')
 def hello_world():
@@ -52,15 +78,28 @@ def wms_proxy():
         (upstream_url + '&' + '&'.join(f'{k}={v}' for k, v in sorted(flat_params.items()))).encode()
     ).hexdigest()
 
-    cached = tile_cache.get(cache_key)
-    if cached is not None:
-        content, content_type = cached
+    # 1. Memory cache (no disk I/O)
+    mem_hit = _mem_get(cache_key)
+    if mem_hit is not None:
+        content, content_type = mem_hit
         return flask.Response(content, status=200, headers={
             'Content-Type': content_type,
-            'X-Tile-Cache': 'HIT',
+            'X-Tile-Cache': 'MEM-HIT',
             'Access-Control-Allow-Origin': '*',
         })
 
+    # 2. Disk cache (persistent across restarts)
+    cached = tile_cache.get(cache_key)
+    if cached is not None:
+        content, content_type = cached
+        _mem_set(cache_key, (content, content_type))   # promote to memory
+        return flask.Response(content, status=200, headers={
+            'Content-Type': content_type,
+            'X-Tile-Cache': 'DISK-HIT',
+            'Access-Control-Allow-Origin': '*',
+        })
+
+    # 3. Upstream fetch
     upstream = http_requests.get(upstream_url, params=flat_params, timeout=30)
 
     excluded_headers = {'content-encoding', 'transfer-encoding', 'connection'}
@@ -74,5 +113,6 @@ def wms_proxy():
     if upstream.status_code == 200:
         content_type = upstream.headers.get('Content-Type', 'image/png')
         tile_cache.set(cache_key, (upstream.content, content_type), expire=DSB_WMS_CACHE_TTL)
+        _mem_set(cache_key, (upstream.content, content_type))
 
     return flask.Response(upstream.content, status=upstream.status_code, headers=headers)
