@@ -20,6 +20,14 @@ const layersMenu   = document.getElementById('layers-menu');
  */
 const WMS_PROXY = '/api/wms-proxy';
 const DSB_WMS_BASE_URL = 'https://ogc.dsb.no/wms.ashx';
+const GEONORGE_GRUNNKART_BASE_URL = 'https://wms.geonorge.no/skwms1/wms.norges_grunnkart';
+
+// Geonorge Vann og vassdrag layers
+// Layer names sourced from GetCapabilities: wms.norges_grunnkart
+const GEONORGE_VANN_LAYERS: { name: string; title: string }[] = [
+  { name: 'Vann',     title: 'Vannflater' },
+  { name: 'Vassdrag', title: 'Vassdrag'   },
+];
 
 //DSB WMS layers from https://ogc.dsb.no/wms.ashx?SERVICE=WMS&REQUEST=GetCapabilities&version=1.3.0
 const DSB_WMS_LAYERS: { name: string; title: string }[] = [
@@ -117,6 +125,45 @@ export function AddDSBWmsLayers(map: MaplibreGL.Map, visible: boolean = false): 
     });
 
     registerLayer(layerId, `DSB: ${layer.title}`, visible, map);
+  }
+}
+
+/**
+ * Adds the Geonorge "Vann og vassdrag" WMS layers (Vannflater + Vassdrag)
+ * to the map, routed through the backend proxy for caching and future
+ * raster analysis.
+ * @param map     The MapLibre map instance
+ * @param visible Whether the layers start visible (default false)
+ */
+export function AddVannOgVassdragLayers(map: MaplibreGL.Map, visible: boolean = false): void {
+  const visibility = visible ? 'visible' : 'none';
+
+  for (const layer of GEONORGE_VANN_LAYERS) {
+    const sourceId = `geonorge-vann-${layer.name.toLowerCase()}`;
+    const layerId  = `geonorge-vann-layer-${layer.name.toLowerCase()}`;
+
+    const tileUrl =
+      `${WMS_PROXY}?url=${encodeURIComponent(GEONORGE_GRUNNKART_BASE_URL)}&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
+      `&LAYERS=${layer.name}&STYLES=` +
+      `&FORMAT=image/png&TRANSPARENT=true` +
+      `&CRS=EPSG:3857` +
+      `&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256`;
+
+    map.addSource(sourceId, {
+      type: 'raster',
+      tiles: [tileUrl],
+      tileSize: 256,
+    });
+
+    map.addLayer({
+      id: layerId,
+      type: 'raster',
+      source: sourceId,
+      paint: { 'raster-opacity': 0.85 },
+      layout: { visibility },
+    });
+
+    registerLayer(layerId, `Vann og vassdrag: ${layer.title}`, visible, map);
   }
 }
 
