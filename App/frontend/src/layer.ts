@@ -13,11 +13,13 @@ const layersToggle = document.getElementById('layers-toggle');
 const layersMenu   = document.getElementById('layers-menu');
 
 /**
- * Backend proxy base URL for DSB WMS tiles.
+ * Backend proxy base URL for WMS tiles.
  * Routing tiles through the backend allows future server-side raster analysis
  * (e.g. classification, overlay computations) without changing the frontend.
+ * Pass the upstream WMS base URL via the `url` query parameter.
  */
-const DSB_WMS_PROXY = '/api/dsb-wms';
+const WMS_PROXY = '/api/wms-proxy';
+const DSB_WMS_BASE_URL = 'https://ogc.dsb.no/wms.ashx';
 
 //DSB WMS layers from https://ogc.dsb.no/wms.ashx?SERVICE=WMS&REQUEST=GetCapabilities&version=1.3.0
 const DSB_WMS_LAYERS: { name: string; title: string }[] = [
@@ -94,7 +96,7 @@ export function AddDSBWmsLayers(map: MaplibreGL.Map, visible: boolean = false): 
     const layerId  = `dsb-wms-layer-${layer.name}`;
 
     const tileUrl =
-      `${DSB_WMS_PROXY}?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
+      `${WMS_PROXY}?url=${encodeURIComponent(DSB_WMS_BASE_URL)}&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
       `&LAYERS=${layer.name}&STYLES=en` +
       `&FORMAT=image/png&TRANSPARENT=true` +
       `&CRS=EPSG:3857` +

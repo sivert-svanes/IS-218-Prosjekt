@@ -5,8 +5,12 @@ import hashlib
 import os
 from App import app, database
 
-DSB_WMS_BASE = 'https://ogc.dsb.no/wms.ashx'
 DSB_WMS_CACHE_TTL = 60 * 60 * 24 * 7
+
+# Allowlist of upstream base URLs that the proxy is permitted to forward to.
+PROXY_ALLOWED_URLS = {
+    'https://ogc.dsb.no/wms.ashx',
+}
 
 _cache_dir = os.path.join(os.path.dirname(__file__), '.tile_cache')
 tile_cache = diskcache.Cache(_cache_dir, size_limit=2 ** 30)  # 1 GB max
@@ -27,19 +31,24 @@ def api_fylke(fylke_id):
     geojson = database.get_shelters_within_fylke(engine, fylke_id)
     return flask.jsonify(geojson)
 
-@app.route('/api/dsb-wms')
-def dsb_wms_proxy():
+@app.route('/api/wms-proxy')
+def wms_proxy():
     """
-    Proxy endpoint for DSB WMS tiles. Allows server-side analysis of tiles.
-    Responses are cached to disk (TTL = 7 days) so repeated tile requests are
-    served instantly without hitting the slow upstream WMS provider.
+    Generic WMS proxy endpoint. Pass the upstream base URL via the `url`
+    query parameter; all other query parameters are forwarded as-is.
     """
     params = flask.request.args.to_dict(flat=False)
     flat_params = {k: v[0] if len(v) == 1 else v for k, v in params.items()}
 
-    # Stable cache key: hash of the sorted, normalised query string
+    upstream_url = flat_params.pop('url', None)
+    if not upstream_url:
+        return flask.Response('Missing required "url" parameter', status=400)
+    if upstream_url not in PROXY_ALLOWED_URLS:
+        return flask.Response(f'URL not in allowlist: {upstream_url}', status=403)
+
+    # Stable cache key: hash of the upstream URL + sorted, normalised query string
     cache_key = hashlib.sha256(
-        '&'.join(f'{k}={v}' for k, v in sorted(flat_params.items())).encode()
+        (upstream_url + '&' + '&'.join(f'{k}={v}' for k, v in sorted(flat_params.items()))).encode()
     ).hexdigest()
 
     cached = tile_cache.get(cache_key)
@@ -51,7 +60,7 @@ def dsb_wms_proxy():
             'Access-Control-Allow-Origin': '*',
         })
 
-    upstream = http_requests.get(DSB_WMS_BASE, params=flat_params, timeout=30)
+    upstream = http_requests.get(upstream_url, params=flat_params, timeout=30)
 
     excluded_headers = {'content-encoding', 'transfer-encoding', 'connection'}
     headers = {
