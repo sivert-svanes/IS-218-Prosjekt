@@ -10,6 +10,8 @@ packages = [
         'psycopg',
         'python-dotenv',
         'spglib',
+        'hashlib',
+        'diskcache'
     ]
 
 def build():
