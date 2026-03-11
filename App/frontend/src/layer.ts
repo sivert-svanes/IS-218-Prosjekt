@@ -115,7 +115,7 @@ export function AddDSBWmsLayers(map: MaplibreGL.Map, visible: boolean = false): 
     const layerId  = `dsb-wms-layer-${layer.name}`;
 
     const tileUrl =
-      `${WMS_PROXY}?url=${encodeURIComponent(DSB_WMS_BASE_URL)}&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
+      `${WMS_PROXY}/5?url=${encodeURIComponent(DSB_WMS_BASE_URL)}&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
       `&LAYERS=${layer.name}&STYLES=en` +
       `&FORMAT=image/png&TRANSPARENT=true` +
       `&CRS=EPSG:3857` +
@@ -154,7 +154,7 @@ export function AddVannOgVassdragLayers(map: MaplibreGL.Map, visible: boolean = 
     const layerId  = `geonorge-vann-layer-${layer.name.toLowerCase()}`;
 
     const tileUrl =
-      `${WMS_PROXY}?url=${encodeURIComponent(GEONORGE_GRUNNKART_BASE_URL)}&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
+      `${WMS_PROXY}/5?url=${encodeURIComponent(GEONORGE_GRUNNKART_BASE_URL)}&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
       `&LAYERS=${layer.name}&STYLES=` +
       `&FORMAT=image/png&TRANSPARENT=true` +
       `&CRS=EPSG:3857` +
@@ -195,7 +195,7 @@ export function AddFKBVeiLayer(map: MaplibreGL.Map, visible: boolean = false): v
   const visibility = visible ? 'visible' : 'none';
 
   const tileUrl =
-    `${WMS_PROXY}?url=${encodeURIComponent(GEONORGE_GRUNNKART_BASE_URL)}&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
+    `${WMS_PROXY}/5?url=${encodeURIComponent(GEONORGE_GRUNNKART_BASE_URL)}&SERVICE=WMS&VERSION=1.3.0&REQUEST=GetMap` +
     `&LAYERS=${encodeURIComponent(GEONORGE_FKB_VEI_LAYERS)}&STYLES=` +
     `&FORMAT=image/png&TRANSPARENT=true` +
     `&CRS=EPSG:3857` +

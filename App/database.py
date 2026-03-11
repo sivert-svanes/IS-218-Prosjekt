@@ -6,7 +6,6 @@ from dotenv import load_dotenv
 load_dotenv()
 CONN_STR = os.getenv("DATABASE_URL")
 
-
 def create_engine():
     if not CONN_STR:
         raise ValueError("DATABASE_URL mangler i .env / environment.")
@@ -41,8 +40,17 @@ def get_brannstasjoner(engine):
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
 
+def get_fylke_bbox_3857(engine, fylke_id):
+    """Return (minx, miny, maxx, maxy) in EPSG:3857 for a county."""
+    with engine.connect() as conn:
+        row = conn.execute(text("""
+            SELECT ST_XMin(b), ST_YMin(b), ST_XMax(b), ST_YMax(b)
+            FROM (SELECT ST_Envelope(ST_Transform(geomfylke, 3857)) AS b
+                  FROM public.fylker WHERE id = :id) t
+        """), {"id": fylke_id}).fetchone()
+        return tuple(row) if row else None
 
-    #Der er 15 fylker å velge mellom. Fylke_id er en integer mellom 1 og 15, hvor 1 er Oslo og 15 er Troms og Finnmark.
+
 def get_shelters_within_fylke(engine, fylke_id):
     with engine.connect() as conn:
         result = conn.execute(text("""
@@ -67,4 +75,3 @@ def get_shelters_within_fylke(engine, fylke_id):
         """), {"fylke_id": fylke_id})
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
-
