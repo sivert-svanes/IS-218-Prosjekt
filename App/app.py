@@ -14,6 +14,7 @@ DSB_WMS_CACHE_TTL = 60 * 60 * 24 * 7
 PROXY_ALLOWED_URLS = {
     'https://ogc.dsb.no/wms.ashx',
     'https://wms.geonorge.no/skwms1/wms.norges_grunnkart',
+    'https://wms.geonorge.no/skwms1/wms.fkb',
 }
 
 _cache_dir = os.path.join(os.path.dirname(__file__), '.tile_cache')
