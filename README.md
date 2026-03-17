@@ -106,8 +106,62 @@ Currently, this is only this is only the base back-end of the project. Going for
 to the goals of the project. Some code in Main.ts will need to be refactored, as it currently has too much responsibility.
 We should also switch to using compiled plsql functions and procedures instead of raw SQL.
 
-## 4. Arkitekturskisse
+## 6. Arkitekturskisse
 <img width="722" height="912" alt="Arkitekturskisse(2)" src="https://github.com/user-attachments/assets/10ae8510-8e08-4c8c-8987-cc83ab4ec3df" />
+
+## 7. Assignment 2 – Spatial Analysis and Extension
+
+### Description of the extension
+
+In this assignment, the system is extended with spatial analysis using Python (GeoPandas) and PostGIS.
+
+The purpose of the extension is to analyze the spatial relationship between population distribution and shelter locations in Agder.
+
+The following functionality has been implemented:
+
+- Loading population grid data (250m resolution)
+- Filtering data to the study area (Agder)
+- Handling and aligning coordinate reference systems (CRS)
+- Performing spatial operations such as clipping and filtering
+
+This enables a more analytical understanding of how shelters are distributed relative to where people live.
+
+---
+
+### Demo of the system
+
+[Insert video / GIF here]
+
+---
+
+### SQL Snippet (PostGIS)
+skriv den her når den er klar.....
+
+### Notebook guide and data setup
+
+The full spatial analysis workflow is documented in a Jupyter Notebook.
+
+[Open analysis notebook](notebooks/analysis.ipynb)
+
+The notebook documents the complete analytical workflow and is structured step-by-step, including:
+
+- Data ingestion and validation  
+- Filtering datasets to the study area (Agder)  
+- Handling coordinate reference systems (CRS) and reprojection  
+- Preparing data for further spatial analysis  
+
+---
+
+### How to reproduce the analysis
+
+To run the notebook locally, the required population dataset must be downloaded manually.
+
+This is done to follow best practices, as large geospatial datasets are not included in the repository.
+
+1. Download population data (250m grid) from GeoNorge  
+2. Convert the dataset to GeoPackage (.gpkg) if necessary  
+3. Place the file in the following directory:
+
 
 
 ![Jork IT](https://media1.tenor.com/m/grh1asJHzg4AAAAC/freaky.gif)
