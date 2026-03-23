@@ -4,6 +4,7 @@ import sqlalchemy
 from sqlalchemy import text
 from sqlalchemy.pool import QueuePool
 from dotenv import load_dotenv
+from enum import Enum
 
 load_dotenv()
 CONN_STR = os.getenv("DATABASE_URL")
@@ -11,6 +12,25 @@ CONN_STR = os.getenv("DATABASE_URL")
 # Constants for Web Mercator conversion (EPSG:3857)
 _MERCATOR_HALF = 20037508.34
 _PI_HALF = math.pi / 2
+
+class RoadType(Enum):
+    BILFERJE          = "Bilferje"
+    ENKEL_BILVEG      = "Enkel bilveg"
+    FORTAU            = "Fortau"
+    GÅGATE            = "Gågate"
+    GANG_OG_SYKKELVEG = "Gang- og sykkelveg"
+    GANGFELT          = "Gangfelt"
+    GANGVEG           = "Gangveg"
+    GATETUN           = "Gatetun"
+    KANALISERT_VEG    = "Kanalisert veg"
+    PASSASJERFERJE    = "Passasjerferje"
+    RAMPE             = "Rampe"
+    RUNDKJØRING       = "Rundkjøring"
+    STI               = "Sti"
+    SYKKELVEG         = "Sykkelveg"
+    TRAKTORVEG        = "Traktorveg"
+    TRAPP             = "Trapp"
+
 
 def web_mercator_to_wgs84(x: float, y: float) -> tuple:
     """Convert Web Mercator (EPSG:3857) to WGS84 (EPSG:4326).
@@ -27,15 +47,16 @@ def create_engine():
     if _engine is None:
         if not CONN_STR:
             raise ValueError("DATABASE_URL mangler i .env / environment.")
-        # Minimal pool configuration for Supabase session mode
+        # Pool configuration for Supabase session mode
         _engine = sqlalchemy.create_engine(
             CONN_STR,
             future=True,
             poolclass=QueuePool,
-            pool_size=1,
-            max_overflow=0,
+            pool_size=5,
+            max_overflow=5,
             pool_recycle=1800,  # Recycle connections after 30 min
             pool_pre_ping=True,  # Test connections before using
+            pool_timeout=10,  # Wait up to 10 seconds for a connection
             connect_args={
                 "connect_timeout": 10,
                 "keepalives": 1,
@@ -108,23 +129,37 @@ def get_shelters_within_fylke(engine, fylke_id):
         return row[0] if row else {"type": "FeatureCollection", "features": []}
 
 
-def get_nvdb_segments_in_bbox(engine, min_x, min_y, max_x, max_y):
+def get_nvdb_segments_in_bbox(engine, min_x, min_y, max_x, max_y, road_types=None):
     """Query pre-loaded NVDB segments from PostGIS.
     Input bounds are in EPSG:3857 (Web Mercator).
     Data is stored as geometry in geom_4326 column (EPSG:4326 WGS84).
+
+    Args:
+        engine: SQLAlchemy engine
+        min_x, min_y, max_x, max_y: Bounding box in EPSG:3857
+        road_types: Optional list/set of road type values to filter by (net.typeveg).
+                   If None, all road types are returned.
     """
     min_lng, min_lat = web_mercator_to_wgs84(min_x, min_y)
     max_lng, max_lat = web_mercator_to_wgs84(max_x, max_y)
 
     with engine.connect() as conn:
-        result = conn.execute(text("""
+        query = """
             SELECT geom_4326, "net.typeveg"
             FROM public.nvdb_roads
             WHERE ST_Intersects(
                 geom_4326,
                 ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326)
-            );
-        """), {"minx": min_lng, "miny": min_lat, "maxx": max_lng, "maxy": max_lat})
+            )
+        """
+        params = {"minx": min_lng, "miny": min_lat, "maxx": max_lng, "maxy": max_lat}
+
+        if road_types:
+            query += ' AND "net.typeveg" = ANY(:road_types)'
+            params["road_types"] = list(road_types)
+
+        query += ";"
+        result = conn.execute(text(query), params)
         return result.fetchall()
 
 
