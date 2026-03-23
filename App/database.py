@@ -1,10 +1,23 @@
 ﻿import os
+import math
 import sqlalchemy
 from sqlalchemy import text
+from sqlalchemy.pool import QueuePool
 from dotenv import load_dotenv
 
 load_dotenv()
 CONN_STR = os.getenv("DATABASE_URL")
+
+# Constants for Web Mercator conversion (EPSG:3857)
+_MERCATOR_HALF = 20037508.34
+_PI_HALF = math.pi / 2
+
+def web_mercator_to_wgs84(x: float, y: float) -> tuple:
+    """Convert Web Mercator (EPSG:3857) to WGS84 (EPSG:4326).
+    Pre-compute constants to avoid repeated calculations."""
+    lng = (x / _MERCATOR_HALF) * 180
+    lat = math.degrees(2 * math.atan(math.exp(y / _MERCATOR_HALF)) - _PI_HALF)
+    return (lng, lat)
 
 # Create a single shared engine with limited pool size for Supabase
 # Supabase in session mode has strict connection limits
@@ -15,15 +28,20 @@ def create_engine():
     if _engine is None:
         if not CONN_STR:
             raise ValueError("DATABASE_URL mangler i .env / environment.")
-        # pool_size=2, max_overflow=1 limits concurrent connections
-        # Supabase session mode has strict limits
+        # Minimal pool configuration for Supabase session mode
         _engine = sqlalchemy.create_engine(
             CONN_STR,
             future=True,
-            pool_size=2,
-            max_overflow=1,
-            pool_recycle=3600,  # Recycle connections after 1 hour
-            pool_pre_ping=True  # Test connections before using
+            poolclass=QueuePool,
+            pool_size=1,
+            max_overflow=0,
+            pool_recycle=1800,  # Recycle connections after 30 min
+            pool_pre_ping=True,  # Test connections before using
+            connect_args={
+                "connect_timeout": 10,
+                "keepalives": 1,
+                "keepalives_idle": 30,
+            }
         )
     return _engine
 
@@ -96,24 +114,18 @@ def get_shelters_within_fylke(engine, fylke_id):
 def get_nvdb_segments_in_bbox(engine, min_x, min_y, max_x, max_y, exclude_flooded=True):
     """Query pre-loaded NVDB segments from PostGIS.
     Input bounds are in EPSG:3857 (Web Mercator).
-    Data is stored as WKT text in geo.wkt column (EPSG:32633 UTM33).
+    Data is stored as geometry in geom_4326 column (EPSG:4326 WGS84).
     """
-    def web_mercator_to_wgs84(x: float, y: float) -> tuple:
-        import math
-        lng = (x / 20037508.34) * 180
-        lat = math.degrees(2 * math.atan(math.exp(y / 20037508.34)) - math.pi / 2)
-        return (lng, lat)
-
     min_lng, min_lat = web_mercator_to_wgs84(min_x, min_y)
     max_lng, max_lat = web_mercator_to_wgs84(max_x, max_y)
 
     with engine.connect() as conn:
         result = conn.execute(text("""
-            SELECT "geo.wkt", "net.typeveg"
+            SELECT geom_4326, "net.typeveg"
             FROM public.nvdb_roads
             WHERE ST_Intersects(
-                ST_SetSRID(ST_GeomFromText("geo.wkt"), 32633),
-                ST_Transform(ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326), 32633)
+                geom_4326,
+                ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326)
             );
         """), {"minx": min_lng, "miny": min_lat, "maxx": max_lng, "maxy": max_lat})
         return result.fetchall()
@@ -122,17 +134,10 @@ def get_nvdb_segments_in_bbox(engine, min_x, min_y, max_x, max_y, exclude_floode
 def get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y):
     """Get NVDB segments as GeoJSON from PostGIS.
     Input bounds are in EPSG:3857 (Web Mercator).
-    Data is stored as geometry in geom column (EPSG:32633 UTM33).
-    Returns GeoJSON in EPSG:4326 (WGS84).
+    Data is stored as geometry in geom_4326 column (EPSG:4326 WGS84).
+    Returns GeoJSON in EPSG:4326 (WGS84) - no transformation needed.
+    Converts to 2D (removes Z coordinates) for compatibility with MapLibre.
     """
-    # Convert Web Mercator bounds to WGS84
-    def web_mercator_to_wgs84(x: float, y: float) -> tuple:
-        import math
-        lng = (x / 20037508.34) * 180
-        lat = math.degrees(2 * math.atan(math.exp(y / 20037508.34)) - math.pi / 2)
-        return (lng, lat)
-
-    # Convert bounds
     min_lng, min_lat = web_mercator_to_wgs84(min_x, min_y)
     max_lng, max_lat = web_mercator_to_wgs84(max_x, max_y)
 
@@ -143,7 +148,7 @@ def get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y):
                 'features', COALESCE(json_agg(
                     json_build_object(
                         'type', 'Feature',
-                        'geometry', ST_AsGeoJSON(ST_Transform(geom, 4326))::json,
+                        'geometry', ST_AsGeoJSON(ST_Force2D(geom_4326))::json,
                         'properties', json_build_object(
                             'typeVeg', "net.typeveg"
                         )
@@ -152,8 +157,8 @@ def get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y):
             ) AS geojson
             FROM public.nvdb_roads
             WHERE ST_Intersects(
-                geom,
-                ST_Transform(ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326), 32633)
+                geom_4326,
+                ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326)
             );
         """), {"minx": min_lng, "miny": min_lat, "maxx": max_lng, "maxy": max_lat})
         row = result.fetchone()

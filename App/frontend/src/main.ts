@@ -207,10 +207,12 @@ if (!maplibregl) {
       }
     }
     const fylkeIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-    AddShelterLayerGeospatial(map, fylkeIds);
-    AddDSBWmsLayers(map);
-    AddVannOgVassdragLayers(map);
-    AddFKBVeiLayer(map);
-    AddNVDBRoadsLayer(map);
+    (async () => {
+      await AddShelterLayerGeospatial(map, fylkeIds);
+      AddDSBWmsLayers(map);
+      AddVannOgVassdragLayers(map);
+      AddFKBVeiLayer(map);
+      await AddNVDBRoadsLayer(map);
+    })().catch(err => console.error('Error loading layers:', err));
   }
 )}
