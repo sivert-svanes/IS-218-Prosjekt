@@ -95,6 +95,29 @@ def api_fylke(fylke_id):
     geojson = database.get_shelters_within_fylke(engine, fylke_id)
     return flask.jsonify(geojson)
 
+@app.route('/api/nvdb/roads')
+def api_nvdb_roads():
+    """Fetch NVDB road segments as GeoJSON from PostGIS."""
+    min_x = flask.request.args.get('min_x', type=float)
+    min_y = flask.request.args.get('min_y', type=float)
+    max_x = flask.request.args.get('max_x', type=float)
+    max_y = flask.request.args.get('max_y', type=float)
+
+    if not all([min_x, min_y, max_x, max_y]):
+        return flask.jsonify({"type": "FeatureCollection", "features": []})
+
+    try:
+        engine = database.create_engine()
+        geojson = database.get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y)
+        feature_count = len(geojson.get('features', []))
+        print(f"NVDB API: bbox=({min_x}, {min_y}, {max_x}, {max_y}), features={feature_count}")
+        return flask.jsonify(geojson)
+    except Exception as e:
+        print(f"Error fetching NVDB roads: {e}")
+        import traceback
+        traceback.print_exc()
+        return flask.jsonify({"type": "FeatureCollection", "features": []})
+
 def _tile_response(hit, label):
     return flask.Response(hit[0], status=200, content_type=hit[1],
                           headers={'X-Tile-Cache': label, 'Access-Control-Allow-Origin': '*'})

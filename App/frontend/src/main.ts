@@ -6,7 +6,7 @@ import {
   PropertyValueSpecification
 } from "maplibre-gl";
 import { registerKonamiCode } from './middleEarth.js';
-import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer} from './layer.js'
+import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer, AddNVDBRoadsLayer} from './layer.js'
 
 declare global {
   interface Window {
@@ -211,5 +211,6 @@ if (!maplibregl) {
     AddDSBWmsLayers(map);
     AddVannOgVassdragLayers(map);
     AddFKBVeiLayer(map);
+    AddNVDBRoadsLayer(map);
   }
 )}
