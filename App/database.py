@@ -20,7 +20,6 @@ def web_mercator_to_wgs84(x: float, y: float) -> tuple:
     return (lng, lat)
 
 # Create a single shared engine with limited pool size for Supabase
-# Supabase in session mode has strict connection limits
 _engine = None
 
 def create_engine():
@@ -45,12 +44,10 @@ def create_engine():
         )
     return _engine
 
-
 def database_test_query(engine):
     with engine.connect() as conn:
         result = conn.execute(text("SELECT * FROM pg_catalog.pg_tables;"))
         print(result.all())
-
 
 def get_brannstasjoner(engine):
     with engine.connect() as conn:
@@ -111,7 +108,7 @@ def get_shelters_within_fylke(engine, fylke_id):
         return row[0] if row else {"type": "FeatureCollection", "features": []}
 
 
-def get_nvdb_segments_in_bbox(engine, min_x, min_y, max_x, max_y, exclude_flooded=True):
+def get_nvdb_segments_in_bbox(engine, min_x, min_y, max_x, max_y):
     """Query pre-loaded NVDB segments from PostGIS.
     Input bounds are in EPSG:3857 (Web Mercator).
     Data is stored as geometry in geom_4326 column (EPSG:4326 WGS84).
@@ -135,8 +132,8 @@ def get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y):
     """Get NVDB segments as GeoJSON from PostGIS.
     Input bounds are in EPSG:3857 (Web Mercator).
     Data is stored as geometry in geom_4326 column (EPSG:4326 WGS84).
-    Returns GeoJSON in EPSG:4326 (WGS84) - no transformation needed.
-    Converts to 2D (removes Z coordinates) for compatibility with MapLibre.
+    Returns GeoJSON in EPSG:4326 (WGS84).
+    Strips Z coordinates for compatibility with MapLibre.
     """
     min_lng, min_lat = web_mercator_to_wgs84(min_x, min_y)
     max_lng, max_lat = web_mercator_to_wgs84(max_x, max_y)

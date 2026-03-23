@@ -366,7 +366,7 @@ export async function AddNVDBRoadsLayer(map: MaplibreGL.Map, visible: boolean = 
     let updateTimeout: number;
     map.on('moveend', () => {
       clearTimeout(updateTimeout);
-      updateTimeout = setTimeout(updateRoads, 500) as unknown as number;
+      updateTimeout = setTimeout(updateRoads, 5) as unknown as number;
     });
 
   } catch (err) {

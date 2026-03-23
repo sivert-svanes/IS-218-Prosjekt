@@ -10,6 +10,8 @@ import requests
 from PIL import Image
 from App.app import tile_cache, _mem_get, _mem_set, DSB_WMS_CACHE_TTL
 
+#UNUSED, SWITCHED TO DIFF APPROACH FOR ROUTING, KEPT AS IT COULD BE USEFUL FOR OTHER STUFF
+
 _FKB_WMS_URL = "https://wms.geonorge.no/skwms1/wms.fkb"
 _R = 6_378_137.0
 _WMS_SCALE_M_PX = 10_000 * 0.00028  # metres per pixel at 1:10 000
@@ -124,11 +126,6 @@ def fetch_fkb_vei_tiles(
         grid_cols=cols,
         grid_rows=rows,
     )
-
-
-# ---------------------------------------------------------------------------
-# Quick-test helper
-# ---------------------------------------------------------------------------
 
 def stitch_and_show(tileset: FKBVeiTileSet) -> np.ndarray:
     """Stitch all tiles into one numpy canvas and display via matplotlib. No disk I/O."""
