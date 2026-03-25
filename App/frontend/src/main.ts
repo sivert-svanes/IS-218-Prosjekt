@@ -7,6 +7,7 @@ import {
 } from "maplibre-gl";
 import { registerKonamiCode } from './middleEarth.js';
 import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer} from './layer.js'
+import { calculateAndDisplayPath } from './shortestPath.js'
 
 declare global {
   interface Window {
@@ -52,6 +53,23 @@ if (!maplibregl) {
   const scale = new maplibregl.ScaleControl({ maxWidth: 320, unit: 'metric' });
   map.addControl(scale, 'bottom-left');
 
+  // Shortest path button handler
+  const shortestPathBtn = document.getElementById('shortest-path-btn');
+  if (shortestPathBtn) {
+    shortestPathBtn.addEventListener('click', async () => {
+      let lat = geolocate && (geolocate as any)._lastKnownPosition?.coords?.latitude;
+      let lng = geolocate && (geolocate as any)._lastKnownPosition?.coords?.longitude;
+
+      // Fallback to map center if no GPS position
+      if (!lat || !lng) {
+        const center = map.getCenter();
+        lat = center.lat;
+        lng = center.lng;
+      }
+
+      await calculateAndDisplayPath(map, lat, lng);
+    });
+  }
 
   map.on('style.load', () => {
     map.setProjection({

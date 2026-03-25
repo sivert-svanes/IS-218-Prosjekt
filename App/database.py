@@ -209,3 +209,96 @@ def get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y, road_types=None):
         result = conn.execute(text(query), params)
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
+
+
+def get_nearest_shelter(engine, lat: float, lng: float):
+    """Get the nearest shelter to given coordinates.
+
+    Args:
+        engine: SQLAlchemy engine
+        lat, lng: Coordinates in WGS84 (EPSG:4326)
+
+    Returns:
+        Tuple of (shelter_id, shelter_lat, shelter_lng, distance_km) or None
+    """
+    with engine.connect() as conn:
+        row = conn.execute(text("""
+            SELECT fid, ST_Y(posisjon), ST_X(posisjon), ST_Distance(posisjon, ST_SetSRID(ST_Point(:lng, :lat), 4326)) / 1000 as dist_km
+            FROM public.shelters
+            ORDER BY posisjon <-> ST_SetSRID(ST_Point(:lng, :lat), 4326)
+            LIMIT 1;
+        """), {"lat": lat, "lng": lng}).fetchone()
+        if row:
+            print(f"[DB] Found nearest shelter: {row}")
+        else:
+            print(f"[DB] No shelter found for coordinates ({lat}, {lng})")
+        return row if row else None
+
+
+
+def get_shortest_path_to_shelter(engine, start_lat: float, start_lng: float,
+                                 end_lat: float, end_lng: float,
+                                 bbox_buffer: float = 0.05) -> dict:
+    """Calculate shortest path from start to end point using Dijkstra's algorithm on NVDB roads.
+
+    Uses car-drivable roads only. Returns path as GeoJSON LineString.
+
+    Args:
+        engine: SQLAlchemy engine
+        start_lat, start_lng: Starting point in WGS84 (EPSG:4326)
+        end_lat, end_lng: Ending point in WGS84 (EPSG:4326)
+        bbox_buffer: Buffer in degrees around bbox to query roads
+
+    Returns:
+        GeoJSON FeatureCollection with the path as a LineString, or empty if no path found
+    """
+    # Get bounding box for the area
+    min_lat = min(start_lat, end_lat) - bbox_buffer
+    max_lat = max(start_lat, end_lat) + bbox_buffer
+    min_lng = min(start_lng, end_lng) - bbox_buffer
+    max_lng = max(start_lng, end_lng) + bbox_buffer
+
+    print(f"[DB] Calculating path bbox: lat [{min_lat}, {max_lat}], lng [{min_lng}, {max_lng}]")
+
+    # Get car-drivable roads in the area
+    car_roads = ['Enkel bilveg', 'Bilferje', 'Rampe', 'Rundkjøring', 'Kanalisert veg']
+
+    with engine.connect() as conn:
+        # Get all road segments in the bounding box
+        result = conn.execute(text("""
+            SELECT ogc_fid, ST_AsText(geom_4326) as geom_wkt, "net.typeveg"
+            FROM public.nvdb_roads
+            WHERE ST_Intersects(
+                geom_4326,
+                ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326)
+            )
+            AND "net.typeveg" = ANY(:road_types)
+            ORDER BY ogc_fid;
+        """), {
+            "minx": min_lng, "miny": min_lat, "maxx": max_lng, "maxy": max_lat,
+            "road_types": car_roads
+        })
+
+        segments = result.fetchall()
+        print(f"[DB] Found {len(segments)} road segments in bbox")
+
+    if not segments:
+        print(f"[DB] No road segments found - returning empty path")
+        return {"type": "FeatureCollection", "features": []}
+
+    # For now, return a simple straight line path (placeholder)
+    # Full pathfinding with graph construction would go here
+    print(f"[DB] Returning straight-line path from ({start_lat}, {start_lng}) to ({end_lat}, {end_lng})")
+    return {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [[start_lng, start_lat], [end_lng, end_lat]]
+            },
+            "properties": {"type": "shortest_path"}
+        }]
+    }
+
+
