@@ -1,4 +1,4 @@
-﻿﻿html, body {
+﻿html, body {
     margin: 0;
     padding: 0;
     width: 100%;
@@ -228,4 +228,28 @@
     to   { opacity: 0; transform: translateX(-50%) translateY(1.5rem); }
 }
 
+@keyframes loading-slide {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
 
+.loading-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, transparent 0%, transparent 30%, rgba(100, 200, 100, 0.3) 50%, transparent 70%, transparent 100%);
+    display: none;
+    z-index: 1;
+}
+
+.loading-bar.active {
+    display: block;
+    animation: loading-slide 1.5s linear infinite;
+}
+
+#shortest-path-btn {
+    position: relative;
+    overflow: hidden;
+}

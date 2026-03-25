@@ -57,10 +57,12 @@ if (!maplibregl) {
   const shortestPathBtn = document.getElementById('shortest-path-btn');
   if (shortestPathBtn) {
     shortestPathBtn.addEventListener('click', async () => {
+      const loadingBar = shortestPathBtn.querySelector('.loading-bar') as HTMLElement;
+      loadingBar?.classList.add('active');
+
       let lat = geolocate && (geolocate as any)._lastKnownPosition?.coords?.latitude;
       let lng = geolocate && (geolocate as any)._lastKnownPosition?.coords?.longitude;
 
-      // Fallback to map center if no GPS position
       if (!lat || !lng) {
         const center = map.getCenter();
         lat = center.lat;
@@ -68,6 +70,7 @@ if (!maplibregl) {
       }
 
       await calculateAndDisplayPath(map, lat, lng);
+      loadingBar?.classList.remove('active');
     });
   }
 
