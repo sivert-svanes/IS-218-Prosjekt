@@ -163,18 +163,24 @@ def get_nvdb_segments_in_bbox(engine, min_x, min_y, max_x, max_y, road_types=Non
         return result.fetchall()
 
 
-def get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y):
+def get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y, road_types=None):
     """Get NVDB segments as GeoJSON from PostGIS.
     Input bounds are in EPSG:3857 (Web Mercator).
     Data is stored as geometry in geom_4326 column (EPSG:4326 WGS84).
     Returns GeoJSON in EPSG:4326 (WGS84).
     Strips Z coordinates for compatibility with MapLibre.
+
+    Args:
+        engine: SQLAlchemy engine
+        min_x, min_y, max_x, max_y: Bounding box in EPSG:3857
+        road_types: Optional list/set of road type values to filter by (net.typeveg).
+                   If None, all road types are returned.
     """
     min_lng, min_lat = web_mercator_to_wgs84(min_x, min_y)
     max_lng, max_lat = web_mercator_to_wgs84(max_x, max_y)
 
     with engine.connect() as conn:
-        result = conn.execute(text("""
+        query = """
             SELECT json_build_object(
                 'type', 'FeatureCollection',
                 'features', COALESCE(json_agg(
@@ -191,7 +197,15 @@ def get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y):
             WHERE ST_Intersects(
                 geom_4326,
                 ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326)
-            );
-        """), {"minx": min_lng, "miny": min_lat, "maxx": max_lng, "maxy": max_lat})
+            )
+        """
+        params = {"minx": min_lng, "miny": min_lat, "maxx": max_lng, "maxy": max_lat}
+
+        if road_types:
+            query += ' AND "net.typeveg" = ANY(:road_types)'
+            params["road_types"] = list(road_types)
+
+        query += ";"
+        result = conn.execute(text(query), params)
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}

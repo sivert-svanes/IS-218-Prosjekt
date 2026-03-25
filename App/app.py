@@ -4,6 +4,7 @@ import diskcache
 import hashlib
 import os
 import threading
+import traceback
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 from App import app, database
@@ -97,24 +98,32 @@ def api_fylke(fylke_id):
 
 @app.route('/api/nvdb/roads')
 def api_nvdb_roads():
-    """Fetch NVDB road segments as GeoJSON from PostGIS."""
+    """Fetch NVDB road segments as GeoJSON from PostGIS.
+
+    Query parameters:
+        min_x, min_y, max_x, max_y: Bounding box in EPSG:3857
+        road_types: Optional comma-separated list of road types to filter by
+    """
     min_x = flask.request.args.get('min_x', type=float)
     min_y = flask.request.args.get('min_y', type=float)
     max_x = flask.request.args.get('max_x', type=float)
     max_y = flask.request.args.get('max_y', type=float)
+    road_types_param = flask.request.args.get('road_types', '')
 
     if not all([min_x, min_y, max_x, max_y]):
         return flask.jsonify({"type": "FeatureCollection", "features": []})
 
+    road_types = None
+    if road_types_param:
+        road_types = set(rt.strip() for rt in road_types_param.split(',') if rt.strip())
+
     try:
         engine = database.create_engine()
-        geojson = database.get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y)
-        feature_count = len(geojson.get('features', []))
-        print(f"NVDB API: bbox=({min_x}, {min_y}, {max_x}, {max_y}), features={feature_count}")
+        geojson = database.get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y, road_types)
+        print(f"NVDB API: bbox=({min_x}, {min_y}, {max_x}, {max_y}), features={len(geojson.get('features', []))}")
         return flask.jsonify(geojson)
     except Exception as e:
         print(f"Error fetching NVDB roads: {e}")
-        import traceback
         traceback.print_exc()
         return flask.jsonify({"type": "FeatureCollection", "features": []})
 
