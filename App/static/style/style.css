@@ -70,7 +70,7 @@
 
 .container {
     display: grid;
-    grid-template-columns: auto auto auto;
+    grid-template-columns: auto auto auto auto;
     padding: 0.25rem;
     grid-gap: 0;
     max-width: max-content;
@@ -239,7 +239,7 @@
     left: 0;
     height: 100%;
     width: 100%;
-    background: linear-gradient(90deg, transparent 0%, transparent 30%, rgba(100, 200, 100, 0.3) 50%, transparent 70%, transparent 100%);
+    background: linear-gradient(90deg, transparent 0%, transparent 70%, rgba(100, 200, 100, 0.15) 85%, transparent 95%, transparent 100%);
     display: none;
     z-index: 1;
 }
@@ -253,3 +253,10 @@
     position: relative;
     overflow: hidden;
 }
+
+#clear-path-btn {
+    padding: 0.25rem 0.35rem !important;
+    font-size: 0.9rem !important;
+    margin: 0.25rem 0.25rem 0.25rem 0 !important;
+}
+

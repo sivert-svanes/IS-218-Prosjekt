@@ -84,9 +84,25 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
       paint: { 'line-color': '#00FF00', 'line-width': 4, 'line-opacity': 0.9 },
       layout: { 'line-join': 'round', 'line-cap': 'round' }
     });
+
+    // Show the clear button
+    const clearBtn = document.getElementById('clear-path-btn');
+    if (clearBtn) clearBtn.style.display = 'flex';
   } catch (err) {
     console.error('Shortest path error:', err);
   }
+}
+
+export function clearPath(map: MaplibreGL.Map): void {
+  const layerId = 'shortest-path-layer';
+  const sourceId = 'shortest-path-source';
+
+  if (map.getLayer(layerId)) map.removeLayer(layerId);
+  if (map.getSource(sourceId)) map.removeSource(sourceId);
+
+  // Hide the clear button
+  const clearBtn = document.getElementById('clear-path-btn');
+  if (clearBtn) clearBtn.style.display = 'none';
 }
 
 

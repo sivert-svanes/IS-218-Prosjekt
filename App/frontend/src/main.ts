@@ -7,7 +7,7 @@ import {
 } from "maplibre-gl";
 import { registerKonamiCode } from './middleEarth.js';
 import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer} from './layer.js'
-import { calculateAndDisplayPath } from './shortestPath.js'
+import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
 
 declare global {
   interface Window {
@@ -71,6 +71,14 @@ if (!maplibregl) {
 
       await calculateAndDisplayPath(map, lat, lng);
       loadingBar?.classList.remove('active');
+    });
+  }
+
+  // Clear path button handler
+  const clearPathBtn = document.getElementById('clear-path-btn');
+  if (clearPathBtn) {
+    clearPathBtn.addEventListener('click', () => {
+      clearPath(map);
     });
   }
 
