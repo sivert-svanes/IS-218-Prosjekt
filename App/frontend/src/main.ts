@@ -7,6 +7,7 @@ import {
 } from "maplibre-gl";
 import { registerKonamiCode } from './middleEarth.js';
 import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer} from './layer.js'
+import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
 
 declare global {
   interface Window {
@@ -52,6 +53,34 @@ if (!maplibregl) {
   const scale = new maplibregl.ScaleControl({ maxWidth: 320, unit: 'metric' });
   map.addControl(scale, 'bottom-left');
 
+  // Shortest path button handler
+  const shortestPathBtn = document.getElementById('shortest-path-btn');
+  if (shortestPathBtn) {
+    shortestPathBtn.addEventListener('click', async () => {
+      const loadingBar = shortestPathBtn.querySelector('.loading-bar') as HTMLElement;
+      loadingBar?.classList.add('active');
+
+      let lat = geolocate && (geolocate as any)._lastKnownPosition?.coords?.latitude;
+      let lng = geolocate && (geolocate as any)._lastKnownPosition?.coords?.longitude;
+
+      if (!lat || !lng) {
+        const center = map.getCenter();
+        lat = center.lat;
+        lng = center.lng;
+      }
+
+      await calculateAndDisplayPath(map, lat, lng);
+      loadingBar?.classList.remove('active');
+    });
+  }
+
+  // Clear path button handler
+  const clearPathBtn = document.getElementById('clear-path-btn');
+  if (clearPathBtn) {
+    clearPathBtn.addEventListener('click', () => {
+      clearPath(map);
+    });
+  }
 
   map.on('style.load', () => {
     map.setProjection({
@@ -207,9 +236,11 @@ if (!maplibregl) {
       }
     }
     const fylkeIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-    AddShelterLayerGeospatial(map, fylkeIds);
-    AddDSBWmsLayers(map);
-    AddVannOgVassdragLayers(map);
-    AddFKBVeiLayer(map);
+    (async () => {
+      await AddShelterLayerGeospatial(map, fylkeIds);
+      AddDSBWmsLayers(map);
+      AddVannOgVassdragLayers(map);
+      AddFKBVeiLayer(map);
+    })().catch(err => console.error('Error loading layers:', err));
   }
 )}

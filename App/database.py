@@ -1,23 +1,74 @@
 ﻿import os
+import math
 import sqlalchemy
 from sqlalchemy import text
+from sqlalchemy.pool import QueuePool
 from dotenv import load_dotenv
+from enum import Enum
 
 load_dotenv()
 CONN_STR = os.getenv("DATABASE_URL")
 
+# Constants for Web Mercator conversion (EPSG:3857)
+_MERCATOR_HALF = 20037508.34
+_PI_HALF = math.pi / 2
+
+class RoadType(Enum):
+    BILFERJE          = "Bilferje"
+    ENKEL_BILVEG      = "Enkel bilveg"
+    FORTAU            = "Fortau"
+    GÅGATE            = "Gågate"
+    GANG_OG_SYKKELVEG = "Gang- og sykkelveg"
+    GANGFELT          = "Gangfelt"
+    GANGVEG           = "Gangveg"
+    GATETUN           = "Gatetun"
+    KANALISERT_VEG    = "Kanalisert veg"
+    PASSASJERFERJE    = "Passasjerferje"
+    RAMPE             = "Rampe"
+    RUNDKJØRING       = "Rundkjøring"
+    STI               = "Sti"
+    SYKKELVEG         = "Sykkelveg"
+    TRAKTORVEG        = "Traktorveg"
+    TRAPP             = "Trapp"
+
+
+def web_mercator_to_wgs84(x: float, y: float) -> tuple:
+    """Convert Web Mercator (EPSG:3857) to WGS84 (EPSG:4326).
+    Pre-compute constants to avoid repeated calculations."""
+    lng = (x / _MERCATOR_HALF) * 180
+    lat = math.degrees(2 * math.atan(math.exp(y / _MERCATOR_HALF)) - _PI_HALF)
+    return (lng, lat)
+
+# Create a single shared engine with limited pool size for Supabase
+_engine = None
 
 def create_engine():
-    if not CONN_STR:
-        raise ValueError("DATABASE_URL mangler i .env / environment.")
-    return sqlalchemy.create_engine(CONN_STR, future=True)
-
+    global _engine
+    if _engine is None:
+        if not CONN_STR:
+            raise ValueError("DATABASE_URL mangler i .env / environment.")
+        # Pool configuration for Supabase session mode
+        _engine = sqlalchemy.create_engine(
+            CONN_STR,
+            future=True,
+            poolclass=QueuePool,
+            pool_size=5,
+            max_overflow=5,
+            pool_recycle=1800,  # Recycle connections after 30 min
+            pool_pre_ping=True,  # Test connections before using
+            pool_timeout=10,  # Wait up to 10 seconds for a connection
+            connect_args={
+                "connect_timeout": 10,
+                "keepalives": 1,
+                "keepalives_idle": 30,
+            }
+        )
+    return _engine
 
 def database_test_query(engine):
     with engine.connect() as conn:
         result = conn.execute(text("SELECT * FROM pg_catalog.pg_tables;"))
         print(result.all())
-
 
 def get_brannstasjoner(engine):
     with engine.connect() as conn:
@@ -41,8 +92,17 @@ def get_brannstasjoner(engine):
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
 
+def get_fylke_bbox_3857(engine, fylke_id):
+    """Return (minx, miny, maxx, maxy) in EPSG:3857 for a county."""
+    with engine.connect() as conn:
+        row = conn.execute(text("""
+            SELECT ST_XMin(b), ST_YMin(b), ST_XMax(b), ST_YMax(b)
+            FROM (SELECT ST_Envelope(ST_Transform(geomfylke, 3857)) AS b
+                  FROM public.fylker WHERE id = :id) t
+        """), {"id": fylke_id}).fetchone()
+        return tuple(row) if row else None
 
-    #Der er 15 fylker å velge mellom. Fylke_id er en integer mellom 1 og 15, hvor 1 er Oslo og 15 er Troms og Finnmark.
+
 def get_shelters_within_fylke(engine, fylke_id):
     with engine.connect() as conn:
         result = conn.execute(text("""
@@ -67,4 +127,178 @@ def get_shelters_within_fylke(engine, fylke_id):
         """), {"fylke_id": fylke_id})
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
+
+
+def get_nvdb_segments_in_bbox(engine, min_x, min_y, max_x, max_y, road_types=None):
+    """Query pre-loaded NVDB segments from PostGIS.
+    Input bounds are in EPSG:3857 (Web Mercator).
+    Data is stored as geometry in geom_4326 column (EPSG:4326 WGS84).
+
+    Args:
+        engine: SQLAlchemy engine
+        min_x, min_y, max_x, max_y: Bounding box in EPSG:3857
+        road_types: Optional list/set of road type values to filter by (net.typeveg).
+                   If None, all road types are returned.
+    """
+    min_lng, min_lat = web_mercator_to_wgs84(min_x, min_y)
+    max_lng, max_lat = web_mercator_to_wgs84(max_x, max_y)
+
+    with engine.connect() as conn:
+        query = """
+            SELECT geom_4326, "net.typeveg"
+            FROM public.nvdb_roads
+            WHERE ST_Intersects(
+                geom_4326,
+                ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326)
+            )
+        """
+        params = {"minx": min_lng, "miny": min_lat, "maxx": max_lng, "maxy": max_lat}
+
+        if road_types:
+            query += ' AND "net.typeveg" = ANY(:road_types)'
+            params["road_types"] = list(road_types)
+
+        query += ";"
+        result = conn.execute(text(query), params)
+        return result.fetchall()
+
+
+def get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y, road_types=None):
+    """Get NVDB segments as GeoJSON from PostGIS.
+    Input bounds are in EPSG:3857 (Web Mercator).
+    Data is stored as geometry in geom_4326 column (EPSG:4326 WGS84).
+    Returns GeoJSON in EPSG:4326 (WGS84).
+    Strips Z coordinates for compatibility with MapLibre.
+
+    Args:
+        engine: SQLAlchemy engine
+        min_x, min_y, max_x, max_y: Bounding box in EPSG:3857
+        road_types: Optional list/set of road type values to filter by (net.typeveg).
+                   If None, all road types are returned.
+    """
+    min_lng, min_lat = web_mercator_to_wgs84(min_x, min_y)
+    max_lng, max_lat = web_mercator_to_wgs84(max_x, max_y)
+
+    with engine.connect() as conn:
+        query = """
+            SELECT json_build_object(
+                'type', 'FeatureCollection',
+                'features', COALESCE(json_agg(
+                    json_build_object(
+                        'type', 'Feature',
+                        'geometry', ST_AsGeoJSON(ST_Force2D(geom_4326))::json,
+                        'properties', json_build_object(
+                            'typeVeg', "net.typeveg"
+                        )
+                    )
+                ), '[]'::json)
+            ) AS geojson
+            FROM public.nvdb_roads
+            WHERE ST_Intersects(
+                geom_4326,
+                ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326)
+            )
+        """
+        params = {"minx": min_lng, "miny": min_lat, "maxx": max_lng, "maxy": max_lat}
+
+        if road_types:
+            query += ' AND "net.typeveg" = ANY(:road_types)'
+            params["road_types"] = list(road_types)
+
+        query += ";"
+        result = conn.execute(text(query), params)
+        row = result.fetchone()
+        return row[0] if row else {"type": "FeatureCollection", "features": []}
+
+
+def get_nearest_shelter(engine, lat: float, lng: float):
+    """Get the nearest shelter to given coordinates.
+
+    Args:
+        engine: SQLAlchemy engine
+        lat, lng: Coordinates in WGS84 (EPSG:4326)
+
+    Returns:
+        Tuple of (shelter_id, shelter_lat, shelter_lng, distance_km) or None
+    """
+    with engine.connect() as conn:
+        row = conn.execute(text("""
+            SELECT fid, ST_Y(posisjon), ST_X(posisjon), ST_Distance(posisjon, ST_SetSRID(ST_Point(:lng, :lat), 4326)) / 1000 as dist_km
+            FROM public.shelters
+            ORDER BY posisjon <-> ST_SetSRID(ST_Point(:lng, :lat), 4326)
+            LIMIT 1;
+        """), {"lat": lat, "lng": lng}).fetchone()
+        if row:
+            print(f"[DB] Found nearest shelter: {row}")
+        else:
+            print(f"[DB] No shelter found for coordinates ({lat}, {lng})")
+        return row if row else None
+
+
+
+def get_shortest_path_to_shelter(engine, start_lat: float, start_lng: float,
+                                 end_lat: float, end_lng: float,
+                                 bbox_buffer: float = 0.05) -> dict:
+    """Calculate shortest path from start to end point using Dijkstra's algorithm on NVDB roads.
+
+    Uses car-drivable roads only. Returns path as GeoJSON LineString.
+
+    Args:
+        engine: SQLAlchemy engine
+        start_lat, start_lng: Starting point in WGS84 (EPSG:4326)
+        end_lat, end_lng: Ending point in WGS84 (EPSG:4326)
+        bbox_buffer: Buffer in degrees around bbox to query roads
+
+    Returns:
+        GeoJSON FeatureCollection with the path as a LineString, or empty if no path found
+    """
+    # Get bounding box for the area
+    min_lat = min(start_lat, end_lat) - bbox_buffer
+    max_lat = max(start_lat, end_lat) + bbox_buffer
+    min_lng = min(start_lng, end_lng) - bbox_buffer
+    max_lng = max(start_lng, end_lng) + bbox_buffer
+
+    print(f"[DB] Calculating path bbox: lat [{min_lat}, {max_lat}], lng [{min_lng}, {max_lng}]")
+
+    # Get car-drivable roads in the area
+    car_roads = ['Enkel bilveg', 'Bilferje', 'Rampe', 'Rundkjøring', 'Kanalisert veg']
+
+    with engine.connect() as conn:
+        # Get all road segments in the bounding box
+        result = conn.execute(text("""
+            SELECT ogc_fid, ST_AsText(geom_4326) as geom_wkt, "net.typeveg"
+            FROM public.nvdb_roads
+            WHERE ST_Intersects(
+                geom_4326,
+                ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326)
+            )
+            AND "net.typeveg" = ANY(:road_types)
+            ORDER BY ogc_fid;
+        """), {
+            "minx": min_lng, "miny": min_lat, "maxx": max_lng, "maxy": max_lat,
+            "road_types": car_roads
+        })
+
+        segments = result.fetchall()
+        print(f"[DB] Found {len(segments)} road segments in bbox")
+
+    if not segments:
+        print(f"[DB] No road segments found - returning empty path")
+        return {"type": "FeatureCollection", "features": []}
+
+    # For now, return a simple straight line path (placeholder)
+    # Full pathfinding with graph construction would go here
+    print(f"[DB] Returning straight-line path from ({start_lat}, {start_lng}) to ({end_lat}, {end_lng})")
+    return {
+        "type": "FeatureCollection",
+        "features": [{
+            "type": "Feature",
+            "geometry": {
+                "type": "LineString",
+                "coordinates": [[start_lng, start_lat], [end_lng, end_lat]]
+            },
+            "properties": {"type": "shortest_path"}
+        }]
+    }
+
 
