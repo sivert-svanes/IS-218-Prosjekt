@@ -33,12 +33,13 @@
 
 ## 4. Data Catalog
 
-| Dataset             | Source                                                                                                                  | Format  | Processing                                                     |
-|---------------------|-------------------------------------------------------------------------------------------------------------------------|---------|----------------------------------------------------------------|
-| Emergency Shelters  | [GeoNorge](https://kartkatalog.geonorge.no/metadata/brannstasjoner/0ccce81d-a72e-46ca-8bd9-57b362376485)                | GML     | Converted to PostGIS geometry, indexed for spatial queries     |
-| Road Network (NVDB) | [Statens Vegvesen](https://www.vegvesen.no/)                                                                            | CSV     | Imported as PostGIS geometry with spatial indexing for routing |
-| County Boundaries   | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) | GeoJSON | Converted to PostGIS polygons for administrative filtering     |
-| Map Style           | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           | JSON    | Applied globe projection and custom styling                    |
+| Dataset            | Source                                                                                                                  | Format   | Processing                                                         |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------|----------|--------------------------------------------------------------------|
+| Emergency Shelters | [GeoNorge](https://kartkatalog.geonorge.no/metadata/tilfluktsrom-offentlige/dbae9aae-10e7-4b75-8d67-7f0e8828f3d8)                | GML      | Converted to PostGIS geometry, indexed for spatial queries         |
+| NVDB               | [Statens Vegvesen](https://www.nvdb.no/hent-og-se-data/eksport/nvdb-eksport/brukerveiledning/)                          | WKT(CSV) | Converted to PostGIS geometry, spatial indexing, TOAST compression |
+| County Boundaries  | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) | GeoJSON  | Converted to PostGIS polygons for administrative filtering         |
+| Map Style          | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           | JSON     | Applied globe projection and custom styling                        |
+| FKB                | [Kartverket](https://wms.geonorge.no/skwms1/wms.fkb?service=wms&request=getcapabilities)                                | WMS      | Caching of tiles in memory and on disk                             |
 
 ## 5. Architecture Overview
 
@@ -46,6 +47,7 @@
 ┌─────────────────────────────────────────────────────────────┐
 │                Frontend (TypeScript/MapLibre)               │
 │   ┌──────────────────────────────────────────────────────┐  │
+|   | main.ts - Application Entry Point                    │  │
 │   │  Interactive Map Display & User Interaction Layer    │  │
 │   │  - Geolocation & Real-time Position Tracking         │  │
 │   │  - Shortest Path Visualization                       │  │
@@ -59,7 +61,7 @@
 │   │  API Endpoints:                                      │  │
 │   │  - /api/fylke/{id} - Get shelters by county          │  │
 │   │  - /api/nearest-shelters - Find k-nearest shelters   │  │
-│   │  - /api/shortest-path - Calculate optimal route      │  │
+│   │  - /api/wms-proxy - mem/disk cache for WMS raster    │  │
 │   │  - /api/nvdb/roads - Query road network data         │  │
 │   └──────────────────────────────────────────────────────┘  │
 └──────────────────────┬──────────────────────────────────────┘
@@ -177,3 +179,11 @@ git clone https://github.com/sivert-svanes/IS-218-Prosjekt.git
 </details>
 
 **Status**: Active Development | **Last Updated**: March 2026
+
+> [!IMPORTANT]
+> <details>
+> <summary style="font-size: 14px; font-weight: bold">Important Image</summary>
+>
+> ![Jork IT](https://media1.tenor.com/m/grh1asJHzg4AAAAC/freaky.gif)
+>
+> </details>
