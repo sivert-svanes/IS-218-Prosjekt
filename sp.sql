@@ -33,11 +33,12 @@ RETURNS JSON AS $$
         COALESCE(
             json_agg(
                 build_geojson_feature(
-                    ST_AsGeoJSON(posisjon)::json,
+                    ST_AsGeoJSON(t.posisjon)::json,
                     to_jsonb(json_build_object(
-                        'distance_km', ROUND((dist_m / 1000.0)::numeric, 2)
-                    )) || to_jsonb(t.*) - 'posisjon'
-                ) ORDER BY dist_m
+                        'distance_km', ROUND((t.dist_m / 1000.0)::numeric, 2),
+                        'fylke_id', f.id
+                    )) || to_jsonb(t.*) - 'posisjon' - 'dist_m'
+                ) ORDER BY t.dist_m
             ),
             '[]'::json
         )
@@ -48,7 +49,8 @@ RETURNS JSON AS $$
         FROM public.shelters
         ORDER BY posisjon <-> ST_SetSRID(ST_Point(p_lng, p_lat), 4326)
         LIMIT LEAST(GREATEST(p_k, 1), 50)
-    ) t;
+    ) t
+    LEFT JOIN public.fylker f ON ST_Within(t.posisjon, f.geomfylke);
 $$ LANGUAGE sql IMMUTABLE STRICT;
 
 CREATE OR REPLACE FUNCTION get_nvdb_roads_geojson(
