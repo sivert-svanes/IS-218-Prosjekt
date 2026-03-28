@@ -213,7 +213,8 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
             let pathCoords = buildPathCoordinates(path, graph, [shelter.lng, shelter.lat]);
             pathCoords.unshift([lng, lat]);
             if (pathCoords.length >= 2) {
-              AddShortestPathLayer(map, pathCoords);
+              const fylkeId = shelterFeature.properties?.fylke_id;
+              AddShortestPathLayer(map, pathCoords, fylkeId);
               return;
             }
           }
@@ -237,7 +238,8 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
       pathCoords.unshift([lng, lat]);
 
       if (pathCoords.length >= 2) {
-        AddShortestPathLayer(map, pathCoords);
+        const fylkeId = shelterFeature.properties?.fylke_id;
+        AddShortestPathLayer(map, pathCoords, fylkeId);
         return;
       }
     }

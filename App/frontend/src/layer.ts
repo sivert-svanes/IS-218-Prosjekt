@@ -290,10 +290,13 @@ export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: n
 /**
  * Adds the shortest path layer to the map with a green line.
  * Removes any existing shortest path layer/source first.
+ * Automatically fits the map bounds to show the entire path.
+ * Enables the shelter layer for the destination county.
  * @param map The MapLibre map instance
  * @param coordinates Array of [lng, lat] coordinates forming the path
+ * @param destinationShelterFylkeId The fylke ID where the shelter is located (optional)
  */
-export function AddShortestPathLayer(map: MaplibreGL.Map, coordinates: [number, number][]): void {
+export function AddShortestPathLayer(map: MaplibreGL.Map, coordinates: [number, number][], destinationShelterFylkeId?: number): void {
   const sourceId = 'shortest-path-source';
   const layerId = 'shortest-path-layer';
 
@@ -329,6 +332,43 @@ export function AddShortestPathLayer(map: MaplibreGL.Map, coordinates: [number, 
       'line-cap': 'round'
     }
   });
+
+  let minLng = coordinates[0][0];
+  let maxLng = coordinates[0][0];
+  let minLat = coordinates[0][1];
+  let maxLat = coordinates[0][1];
+
+  for (const [lng, lat] of coordinates) {
+    minLng = Math.min(minLng, lng);
+    maxLng = Math.max(maxLng, lng);
+    minLat = Math.min(minLat, lat);
+    maxLat = Math.max(maxLat, lat);
+  }
+
+  const centerLng = (minLng + maxLng) / 2;
+  const centerLat = (minLat + maxLat) / 2;
+  const camera = map.cameraForBounds(
+    [[minLng, minLat], [maxLng, maxLat]],
+    { padding: 100 }
+  );
+  const zoomLevel = camera?.zoom ?? 12;
+
+  map.once('render', () => {
+    map.flyTo({
+      center: [centerLng, centerLat],
+      zoom: zoomLevel,
+      duration: 1500,
+      essential: true
+    });
+  });
+
+  // Enable the shelter layer for the destination county
+  if (destinationShelterFylkeId) {
+    const shelterLayerId = `shelters-circle-${destinationShelterFylkeId}`;
+    if (map.getLayer(shelterLayerId)) {
+      map.setLayoutProperty(shelterLayerId, 'visibility', 'visible');
+    }
+  }
 
   // Show the clear button
   const btn = document.getElementById('clear-path-btn');
