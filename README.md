@@ -6,30 +6,41 @@
 
 ## 2. Demo
 
-[System demonstration](https://github.com/user-attachments/assets/8ae4a56b-81f2-4691-b293-9cc92c3a3474)
+> [!IMPORTANT]
+> <details>
+> <summary style="font-size: 14px; font-weight: bold">System Demonstration</summary>
+>
+> [Video: ShelterLog System Demo](https://github.com/user-attachments/assets/8ae4a56b-81f2-4691-b293-9cc92c3a3474)
+>
+> </details>
 
 ## 3. Technical Stack
 
 ### Frontend
-| Component | Version |
-|-----------|---------|
-| TypeScript | ^4.9.5 |
-| MapLibre GL | ^4.7.1 |
-| Node.js | Latest LTS |
+| Component   | Version    | Usage                                              |
+|-------------|------------|----------------------------------------------------|
+| TypeScript  | ^4.9.5     | Javascript is ass, i refuse to write it            |
+| MapLibre GL | ^4.7.1     | Interactive map rendering and layer management     |
+| Node.js     | Latest LTS | JavaScript runtime for development and build tools |
 
 ### Backend
-| Component | Version |
-|-----------|---------|
-| Python | 3.10+ |
-| Flask | ^3.1.3 |
-| SQLAlchemy | ^2.0.46 |
-| GeoAlchemy2 | ^0.18.1 |
+| Component   | Version | Usage                                            |
+|-------------|---------|--------------------------------------------------|
+| Python      | 3.10+   | Core programming language for backend            |
+| Flask       | ^3.1.3  | Web framework                                    |
+| SQLAlchemy  | ^2.0.46 | ORM for database abstraction and queries         |
+| GeoAlchemy2 | ^0.18.1 | PostGIS extension for spatial data in SQLAlchemy |
+| diskcache   | n.a.    | Optional disk-based caching for performance      |
+| spglib      | ^2.7.0  | Space group library for crystallographic data    |
+| psycopg2    | ^2.9.11 | PostgreSQL adapter for Python                    |
+| psycopg     | ^3.3.3  | Modern PostgreSQL adapter (psycopg3)             |
+| hashlib     | n.a.    | Built-in cryptographic hashing                   |
 
 ### Database
-| Component | Version |
-|-----------|---------|
-| PostgreSQL | 15+ |
-| PostGIS | 3.3+ |
+| Component  | Version | Usage |
+|------------|---------|-------|
+| PostgreSQL | 15+     | Relational database server for data persistence |
+| PostGIS    | 3.3+    | Spatial extension for storing and querying geospatial data |
 
 ## 4. Data Catalog
 
@@ -44,41 +55,65 @@
 ## 5. Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                Frontend (TypeScript/MapLibre)               │
-│   ┌──────────────────────────────────────────────────────┐  │
-|   | main.ts - Application Entry Point                    │  │
-│   │  Interactive Map Display & User Interaction Layer    │  │
-│   │  - Geolocation & Real-time Position Tracking         │  │
-│   │  - Shortest Path Visualization                       │  │
-│   │  - Shelter Layer & County Filtering                  │  │
-│   └──────────────────────────────────────────────────────┘  │
-└──────────────────────┬──────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────────┐
+│                 Frontend (TypeScript/MapLibre)               │
+│   ┌───────────────────────────────────────────────────────┐  │
+│   │ main.ts - Application Entry Point                     │  │
+│   │  - Initializes map and loads all layers               │  │
+│   │  - Manages geolocation and user interaction           │  │
+│   │                                                       │  │
+│   │ layer.ts - Layer Management                           │  │
+│   │  - AddShelterLayerGeospatial: Load shelter data       │  │
+│   │  - AddShortestPathLayer: Display calculated routes    │  │
+│   │  - registerLayer: Register layers in dropdown menu    │  │
+│   │                                                       │  │
+│   │ shortestPath.ts - Pathfinding & Routing Logic         │  │
+│   │  - calculateShortestPath: A* algorithm implementation │  │
+│   │  - findNearestShelters: Query API for nearest         │  │
+│   │  - Handle path visualization on map                   │  │
+│   │                                                       │  │
+│   │ starsLayer.ts - Custom Visualization Layer            │  │
+│   │  - Add custom styling and effects to map              │  │
+│   │                                                       │  │
+│   │ types/ - TypeScript Type Definitions                  │  │
+│   │  - maplibre-gl-augmentations.d.ts: Extended types     │  │
+│   └───────────────────────────────────────────────────────┘  │
+└──────────────────────┬───────────────────────────────────────┘
                        │ HTTP REST API
-┌──────────────────────▼──────────────────────────────────────┐
-│                 Backend (Flask/Python)                      │
-│   ┌──────────────────────────────────────────────────────┐  │
-│   │  API Endpoints:                                      │  │
-│   │  - /api/fylke/{id} - Get shelters by county          │  │
-│   │  - /api/nearest-shelters - Find k-nearest shelters   │  │
-│   │  - /api/wms-proxy - mem/disk cache for WMS raster    │  │
-│   │  - /api/nvdb/roads - Query road network data         │  │
-│   └──────────────────────────────────────────────────────┘  │
-└──────────────────────┬──────────────────────────────────────┘
+┌──────────────────────▼───────────────────────────────────────┐
+│                  Backend (Flask/Python)                      │
+│   ┌───────────────────────────────────────────────────────┐  │
+│   │  API Endpoints:                                       │  │
+│   │  - /api/fylke/{id} - Get shelters by county           │  │
+│   │  - /api/nearest-shelters - Find k-nearest shelters    │  │
+│   │  - /api/wms-proxy - mem/disk cache for WMS raster     │  │
+│   │  - /api/nvdb/roads - Query road network data          │  │
+│   └───────────────────────────────────────────────────────┘  │
+└──────────────────────┬───────────────────────────────────────┘
                        │ SQL Queries & Stored Procedures
-┌──────────────────────▼──────────────────────────────────────┐
-│            PostgreSQL + PostGIS Database                    │
-│   ┌──────────────────────────────────────────────────────┐  │
-│   │  Tables:                                             │  │
-│   │  - shelters (emergency shelter locations)            │  │
-│   │  - nvdb_roads (road network geometry)                │  │
-│   │  - fylker (county administrative boundaries)         │  │
-│   │                                                      │  │
-│   │  Spatial Indexes:                                    │  │
-│   │  - GiST/BRIN indexes on geometry columns             │  │
-│   │  - Stored Functions for spatial calculations         │  │
-│   └──────────────────────────────────────────────────────┘  │
-└─────────────────────────────────────────────────────────────┘
+┌──────────────────────▼───────────────────────────────────────┐
+│             PostgreSQL + PostGIS Database                    │
+│   ┌───────────────────────────────────────────────────────┐  │
+│   │  Tables:                                              │  │
+│   │  - shelters                                           │  │
+│   │    - Emergency shelter locations                      │  │
+│   │  - nvdb_roads                                         │  │
+│   │    - Road network graph                               │  │
+│   │    - Compressed using TOAST                           │  │
+│   │  - fylker                                             │  │
+│   │    - County administrative boundaries                 │  │
+│   │                                                       │  │
+│   │  Spatial Indexes:                                     │  │
+│   │  - GiST/BRIN indexes on geometry columns              │  │
+│   │                                                       │  │
+│   │  Stored Functions (in sp.sql):                        │  │
+│   │  - get_shelters_within_fylke: Fetch shelters by id    │  │
+│   │  - get_k_nearest_shelters: K-NN spatial search        │  │
+│   │  - get_nvdb_roads_geojson: Query road network         │  │
+│   │  - build_geojson_feature: Utility for GeoJSON format  │  │
+│   │  - build_geojson_collection: Aggregate GeoJSON data   │  │
+│   └───────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────┘
 ```
 
 **Data Flow:**
@@ -88,7 +123,7 @@
 4. Results returned as GeoJSON to frontend
 5. Frontend visualizes path and shelter locations on interactive map
 
-# 2. Deliverable 1 - Reflection and Future Improvements
+# 2. Deliverable 1 - Webutvikling, GIS, Kartografi
 
 ## 1. Further Improvements
 
@@ -107,6 +142,20 @@
 - Use compiled PLpgSQL functions and procedures instead of raw SQL.
   - extract all sql queries into a seperate stored functions or prodecures
   - use the stored functions and procedures in the backend instead of raw SQL
+
+# 3. Deliverable 2 - GIScience og Romling Analyse
+## 1. Section A
+
+## 2. SECTION B
+
+### 1. Dynamic SQL
+
+
+
+### 2. ST-functions
+
+### 3. User Interface
+
 
 ## 6. Setup Instructions
 
