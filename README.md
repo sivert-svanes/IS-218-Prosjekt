@@ -2,7 +2,8 @@
 
 ## 1. Project Overview
 
-**ShelterLog** is an interactive map application that locates public emergency shelters and calculates optimal routes to the nearest shelter based on your current location. The system integrates real-time geospatial data with pathfinding algorithms to provide users with quick access to critical shelter resources during emergencies.
+Our goal is to display public shelters and their current supplies on the map. The system will recognize locations with
+low supply and provide routes to get supplies, accounting for threats.
 
 ## 2. Demo
 
