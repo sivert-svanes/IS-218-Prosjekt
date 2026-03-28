@@ -1,4 +1,5 @@
 ﻿import type * as MaplibreGL from "maplibre-gl";
+import { AddShortestPathLayer, ClearShortestPathLayer } from "./layer.js";
 
 let roadNetworkCache: any = null;
 const WGS84_CONSTANT = 20037508.34;
@@ -23,8 +24,6 @@ const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
-
-
 
 async function ensureRoadNetworkLoaded(map: MaplibreGL.Map, userLat: number, userLng: number, shelterLat: number, shelterLng: number): Promise<void> {
   // Calculate haversine distance to shelter
@@ -101,29 +100,17 @@ function findNearestInGraph(lat: number, lng: number, graph: Map<string, GraphNo
   return nearest;
 }
 
-function collectAllShelters(map: MaplibreGL.Map): any[] {
-  const shelters: any[] = [];
-  for (let i = 1; i <= 15; i++) {
-    const source = map.getSource(`shelters-fylke-${i}`) as any;
-    if (!source?._data) continue;
-    const data = source._data.geojson || source._data;
-    if (data?.features) shelters.push(...data.features);
+async function findNearestSheltersViaAPI(lat: number, lng: number, k: number = 10): Promise<any[]> {
+  try {
+    const response = await fetch(`/api/nearest-shelters?lat=${lat}&lng=${lng}&k=${k}`);
+    if (response.ok) {
+      const geojson = await response.json();
+      return geojson.features || [];
+    }
+  } catch (err) {
+    console.error('Failed to fetch nearest shelters from API:', err);
   }
-  return shelters;
-}
-
-function findNearestShelter(lat: number, lng: number, shelters: any[]): { lat: number; lng: number } | null {
-  let nearest = null;
-  let minDist = Infinity;
-
-  shelters.forEach((f) => {
-    if (f.geometry.type !== 'Point') return;
-    const [sLng, sLat] = f.geometry.coordinates;
-    const dist = Math.hypot(sLng - lng, sLat - lat);
-    if (dist < minDist) { minDist = dist; nearest = { lat: sLat, lng: sLng }; }
-  });
-
-  return nearest;
+  return [];
 }
 
 function aStar(graph: Map<string, GraphNode>, startId: string, endId: string, endLat: number, endLng: number): string[] {
@@ -165,14 +152,14 @@ function aStar(graph: Map<string, GraphNode>, startId: string, endId: string, en
 
     currentNode.neighbors.forEach(({ nodeId: neighbor, segment }) => {
       const tentativeGScore = (gScore.get(current!) ?? 0) + segment.distance;
-      if (tentativeGScore < (gScore.get(neighbor) ?? Infinity)) {
-        cameFrom.set(neighbor, current!);
-        gScore.set(neighbor, tentativeGScore);
+      if (tentativeGScore >= (gScore.get(neighbor) ?? Infinity)) return;
 
-        const neighborNode = graph.get(neighbor)!;
-        fScore.set(neighbor, tentativeGScore + haversineDistance(neighborNode.lat, neighborNode.lng, endLat, endLng));
-        openSet.add(neighbor);
-      }
+      cameFrom.set(neighbor, current!);
+      gScore.set(neighbor, tentativeGScore);
+
+      const neighborNode = graph.get(neighbor)!;
+      fScore.set(neighbor, tentativeGScore + haversineDistance(neighborNode.lat, neighborNode.lng, endLat, endLng));
+      openSet.add(neighbor);
     });
   }
 
@@ -201,92 +188,66 @@ function buildPathCoordinates(path: string[], graph: Map<string, GraphNode>, end
   return coords;
 }
 
-function updateLayerOnMap(map: MaplibreGL.Map, coords: [number, number][]): void {
-  const sourceId = 'shortest-path-source';
-  const layerId = 'shortest-path-layer';
-
-  if (map.getLayer(layerId)) map.removeLayer(layerId);
-  if (map.getSource(sourceId)) map.removeSource(sourceId);
-
-  map.addSource(sourceId, {
-    type: 'geojson',
-    data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }] }
-  });
-
-  map.addLayer({
-    id: layerId,
-    type: 'line',
-    source: sourceId,
-    paint: { 'line-color': '#00FF00', 'line-width': 4, 'line-opacity': 0.9 },
-    layout: { 'line-join': 'round', 'line-cap': 'round' }
-  });
-
-  const btn = document.getElementById('clear-path-btn');
-  if (btn) btn.style.display = 'flex';
-}
-
 export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, lng: number): Promise<void> {
   try {
-    const shelters = collectAllShelters(map);
-    if (shelters.length === 0) return;
+    // Get k=10 nearest shelters from database
+    const shelterFeatures = await findNearestSheltersViaAPI(lat, lng, 10);
+    if (shelterFeatures.length === 0) return;
 
-    const shelter = findNearestShelter(lat, lng, shelters);
-    if (!shelter) return;
+    // Try each shelter in order of distance until we find a valid path
+    for (const shelterFeature of shelterFeatures) {
+      if (shelterFeature.geometry.type !== 'Point') continue;
 
-    // Attempt 1: Try with cached road graph if it exists
-    if (roadNetworkCache?.features) {
+      const [shelterLng, shelterLat] = shelterFeature.geometry.coordinates;
+      const shelter = { lat: shelterLat, lng: shelterLng };
+
+      // Attempt 1: Try with cached road graph if it exists
+      if (roadNetworkCache?.features) {
+        const graph = buildRoadGraph(roadNetworkCache.features);
+        const startId = findNearestInGraph(lat, lng, graph);
+        const endId = findNearestInGraph(shelter.lat, shelter.lng, graph);
+
+        if (startId && endId) {
+          const path = aStar(graph, startId, endId, shelter.lat, shelter.lng);
+          if (path.length > 0) {
+            let pathCoords = buildPathCoordinates(path, graph, [shelter.lng, shelter.lat]);
+            pathCoords.unshift([lng, lat]);
+            if (pathCoords.length >= 2) {
+              AddShortestPathLayer(map, pathCoords);
+              return;
+            }
+          }
+        }
+      }
+
+      // Attempt 2: Fetch new road graph and retry
+      await ensureRoadNetworkLoaded(map, lat, lng, shelter.lat, shelter.lng);
+      if (!roadNetworkCache?.features) continue;
+
       const graph = buildRoadGraph(roadNetworkCache.features);
       const startId = findNearestInGraph(lat, lng, graph);
       const endId = findNearestInGraph(shelter.lat, shelter.lng, graph);
 
-      if (startId && endId) {
-        const path = aStar(graph, startId, endId, shelter.lat, shelter.lng);
-        if (path.length > 0) {
-          let pathCoords = buildPathCoordinates(path, graph, [shelter.lng, shelter.lat]);
-          pathCoords.unshift([lng, lat]);
-          if (pathCoords.length >= 2) {
-            updateLayerOnMap(map, pathCoords);
-            return;
-          }
-        }
+      if (!startId || !endId) continue;
+
+      const path = aStar(graph, startId, endId, shelter.lat, shelter.lng);
+      if (path.length === 0) continue;
+
+      let pathCoords = buildPathCoordinates(path, graph, [shelter.lng, shelter.lat]);
+      pathCoords.unshift([lng, lat]);
+
+      if (pathCoords.length >= 2) {
+        AddShortestPathLayer(map, pathCoords);
+        return;
       }
     }
 
-    // Attempt 2: Fetch new road graph and retry
-    await ensureRoadNetworkLoaded(map, lat, lng, shelter.lat, shelter.lng);
-    if (!roadNetworkCache?.features) return;
-
-    const graph = buildRoadGraph(roadNetworkCache.features);
-    const startId = findNearestInGraph(lat, lng, graph);
-    const endId = findNearestInGraph(shelter.lat, shelter.lng, graph);
-
-    if (!startId || !endId) return;
-
-    const path = aStar(graph, startId, endId, shelter.lat, shelter.lng);
-    if (path.length === 0) return;
-
-    let pathCoords = buildPathCoordinates(path, graph, [shelter.lng, shelter.lat]);
-    pathCoords.unshift([lng, lat]);
-
-    if (pathCoords.length >= 2) {
-      updateLayerOnMap(map, pathCoords);
-    }
+    console.warn('Could not find valid path to any of the nearest shelters');
   } catch (err) {
     console.error('Shortest path error:', err);
   }
 }
 
 export function clearPath(map: MaplibreGL.Map): void {
-  const layerId = 'shortest-path-layer';
-  const sourceId = 'shortest-path-source';
-
-  if (map.getLayer(layerId)) map.removeLayer(layerId);
-  if (map.getSource(sourceId)) map.removeSource(sourceId);
-
-  const btn = document.getElementById('clear-path-btn');
-  if (btn) btn.style.display = 'none';
+  ClearShortestPathLayer(map);
 }
-
-
-
-

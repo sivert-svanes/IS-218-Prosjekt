@@ -96,6 +96,36 @@ def api_fylke(fylke_id):
     geojson = database.get_shelters_within_fylke(engine, fylke_id)
     return flask.jsonify(geojson)
 
+@app.route('/api/nearest-shelters')
+def api_nearest_shelters():
+    """Get k nearest shelters to given coordinates.
+
+    Query parameters:
+        lat: Latitude in WGS84 (EPSG:4326)
+        lng: Longitude in WGS84 (EPSG:4326)
+        k: Number of nearest shelters to return (default 10, max 50)
+
+    Returns: GeoJSON FeatureCollection with k nearest shelters
+    """
+    lat = flask.request.args.get('lat', type=float)
+    lng = flask.request.args.get('lng', type=float)
+    k = flask.request.args.get('k', default=10, type=int)
+
+    if lat is None or lng is None:
+        return flask.jsonify({"type": "FeatureCollection", "features": [], "error": "Missing lat/lng"})
+
+    # Limit k to prevent abuse
+    k = min(max(1, k), 50)
+
+    try:
+        engine = database.create_engine()
+        geojson = database.get_k_nearest_shelters(engine, lat, lng, k)
+        return flask.jsonify(geojson)
+    except Exception as e:
+        print(f"Error fetching nearest shelters: {e}")
+        traceback.print_exc()
+        return flask.jsonify({"type": "FeatureCollection", "features": []})
+
 @app.route('/api/nvdb/roads')
 def api_nvdb_roads():
     """Fetch NVDB road segments as GeoJSON from PostGIS.
@@ -191,46 +221,3 @@ def wms_proxy(fylke_id: int = None):
         with _in_flight_lock:
             _in_flight.pop(cache_key, None)
         event.set()
-
-@app.route('/api/shortest-path')
-def api_shortest_path():
-    """Calculate shortest path from user location to nearest shelter.
-
-    Query parameters:
-        lat, lng: Current user position in WGS84 (EPSG:4326)
-    """
-    lat = flask.request.args.get('lat', type=float)
-    lng = flask.request.args.get('lng', type=float)
-
-    print(f"[API] Shortest path request: lat={lat}, lng={lng}")
-
-    if lat is None or lng is None:
-        print(f"[API] Missing coordinates: lat={lat}, lng={lng}")
-        return flask.jsonify({"type": "FeatureCollection", "features": []})
-
-    try:
-        engine = database.create_engine()
-
-        # Get nearest shelter
-        print(f"[API] Getting nearest shelter...")
-        shelter = database.get_nearest_shelter(engine, lat, lng)
-        if not shelter:
-            print(f"[API] No shelter found")
-            return flask.jsonify({"type": "FeatureCollection", "features": []})
-
-        shelter_id, shelter_lat, shelter_lng, distance_km = shelter
-        print(f"[API] Found shelter: id={shelter_id}, lat={shelter_lat}, lng={shelter_lng}, dist={distance_km:.2f}km")
-
-        # Calculate path to nearest shelter
-        print(f"[API] Calculating path...")
-        path_geojson = database.get_shortest_path_to_shelter(engine, lat, lng, shelter_lat, shelter_lng)
-
-        print(f"[API] Path result: {len(path_geojson.get('features', []))} features")
-        print(f"[API] Shortest path: from ({lat}, {lng}) to shelter {shelter_id} at ({shelter_lat}, {shelter_lng}), distance={distance_km:.2f}km")
-
-        return flask.jsonify(path_geojson)
-    except Exception as e:
-        print(f"[API] Error calculating shortest path: {e}")
-        traceback.print_exc()
-        return flask.jsonify({"type": "FeatureCollection", "features": []})
-
