@@ -1,4 +1,4 @@
-# ShelterLog – Emergency Shelter Routing System
+# ShelterLog
 
 ## 1. Project Overview
 
