@@ -211,25 +211,12 @@ def get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y, road_types=None):
         return row[0] if row else {"type": "FeatureCollection", "features": []}
 
 
-def get_nearest_shelter(engine, lat: float, lng: float):
-    """Get the nearest shelter to given coordinates.
-
-    Args:
-        engine: SQLAlchemy engine
-        lat, lng: Coordinates in WGS84 (EPSG:4326)
-
-    Returns:
-        Tuple of (shelter_id, shelter_lat, shelter_lng, distance_km) or None
-    """
+def get_k_nearest_shelters(engine, lat: float, lng: float, k: int = 10):
     with engine.connect() as conn:
-        row = conn.execute(text("""
-            SELECT fid, ST_Y(posisjon), ST_X(posisjon), ST_Distance(posisjon, ST_SetSRID(ST_Point(:lng, :lat), 4326)) / 1000 as dist_km
-            FROM public.shelters
-            ORDER BY posisjon <-> ST_SetSRID(ST_Point(:lng, :lat), 4326)
-            LIMIT 1;
-        """), {"lat": lat, "lng": lng}).fetchone()
-        if row:
-            print(f"[DB] Found nearest shelter: {row}")
-        else:
-            print(f"[DB] No shelter found for coordinates ({lat}, {lng})")
-        return row if row else None
+        result = conn.execute(text("""
+            SELECT get_k_nearest_shelters(:lat, :lng, :k);
+        """), {"lat": lat, "lng": lng, "k": k})
+        row = result.fetchone()
+        return row[0] if row else {"type": "FeatureCollection", "features": []}
+
+
