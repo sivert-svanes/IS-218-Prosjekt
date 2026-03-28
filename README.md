@@ -159,7 +159,7 @@ The ShelterLog application calculates optimal routes to the nearest emergency sh
    - Dynamic SQL query finds the k=10 nearest shelters using PostGIS spatial indexing
 
 2. **Road Network Retrieval**
-   - NVDB road network data is fetched from the database, based on the 
+   - NVDB road network data is fetched from the database
      - If no road graph is cached
      - If the cached road graph fails to find a route
      - The size of the bounding box is based on the haversine distance between the user's location and the nearest shelter
@@ -221,8 +221,6 @@ The ShelterLog application calculates optimal routes to the nearest emergency sh
 
 The `get_nvdb_roads_geojson` is a stored function that retrieves road network data from the database, using spatial ST functions.
 
-#### ST_MakeEnvelope - Creating Bounding Box Geometry
-
 1. **Stored Function Snippet**
     
     ```sql
@@ -243,6 +241,10 @@ The `get_nvdb_roads_geojson` is a stored function that retrieves road network da
         AND (p_road_types IS NULL OR "net.typeveg" = ANY(p_road_types));
     $$ LANGUAGE sql IMMUTABLE STRICT;
    ```
+
+#### ST_MakeEnvelope - Creating Bounding Box Geometry
+
+
 
 1. **Envelope Construction**
    - Frontend A* function sends bbox coordinates: `min_lng, min_lat, max_lng, max_lat`
