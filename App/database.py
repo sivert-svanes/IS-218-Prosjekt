@@ -1,70 +1,120 @@
 ﻿import os
+import math
 import sqlalchemy
 from sqlalchemy import text
+from sqlalchemy.pool import QueuePool
 from dotenv import load_dotenv
+from enum import Enum
 
 load_dotenv()
 CONN_STR = os.getenv("DATABASE_URL")
 
+# Constants for Web Mercator conversion (EPSG:3857)
+_MERCATOR_HALF = 20037508.34
+_PI_HALF = math.pi / 2
+
+class RoadType(Enum):
+    BILFERJE          = "Bilferje"
+    ENKEL_BILVEG      = "Enkel bilveg"
+    FORTAU            = "Fortau"
+    GÅGATE            = "Gågate"
+    GANG_OG_SYKKELVEG = "Gang- og sykkelveg"
+    GANGFELT          = "Gangfelt"
+    GANGVEG           = "Gangveg"
+    GATETUN           = "Gatetun"
+    KANALISERT_VEG    = "Kanalisert veg"
+    PASSASJERFERJE    = "Passasjerferje"
+    RAMPE             = "Rampe"
+    RUNDKJØRING       = "Rundkjøring"
+    STI               = "Sti"
+    SYKKELVEG         = "Sykkelveg"
+    TRAKTORVEG        = "Traktorveg"
+    TRAPP             = "Trapp"
+
+
+def web_mercator_to_wgs84(x: float, y: float) -> tuple:
+    """Convert Web Mercator (EPSG:3857) to WGS84 (EPSG:4326).
+    Pre-compute constants to avoid repeated calculations."""
+    lng = (x / _MERCATOR_HALF) * 180
+    lat = math.degrees(2 * math.atan(math.exp(y / _MERCATOR_HALF)) - _PI_HALF)
+    return (lng, lat)
+
+# Create a single shared engine with limited pool size for Supabase
+_engine = None
 
 def create_engine():
-    if not CONN_STR:
-        raise ValueError("DATABASE_URL mangler i .env / environment.")
-    return sqlalchemy.create_engine(CONN_STR, future=True)
-
+    global _engine
+    if _engine is None:
+        if not CONN_STR:
+            raise ValueError("DATABASE_URL mangler i .env / environment.")
+        # Pool configuration for Supabase session mode
+        _engine = sqlalchemy.create_engine(
+            CONN_STR,
+            future=True,
+            poolclass=QueuePool,
+            pool_size=5,
+            max_overflow=5,
+            pool_recycle=1800,  # Recycle connections after 30 min
+            pool_pre_ping=True,  # Test connections before using
+            pool_timeout=10,  # Wait up to 10 seconds for a connection
+            connect_args={
+                "connect_timeout": 10,
+                "keepalives": 1,
+                "keepalives_idle": 30,
+            }
+        )
+    return _engine
 
 def database_test_query(engine):
     with engine.connect() as conn:
         result = conn.execute(text("SELECT * FROM pg_catalog.pg_tables;"))
         print(result.all())
 
-
 def get_brannstasjoner(engine):
     with engine.connect() as conn:
-        result = conn.execute(text("""
-            SELECT json_build_object(
-                'type', 'FeatureCollection',
-                'features', COALESCE(json_agg(
-                    json_build_object(
-                        'type', 'Feature',
-                        'geometry', ST_AsGeoJSON(geom)::json,
-                        'properties', to_jsonb(t.*) - 'geom'
-                    )
-                ), '[]'::json)
-            ) AS geojson
-            FROM (
-                SELECT *
-                FROM public.brannstasjoner
-                LIMIT 1000
-            ) t;
-        """))
+        result = conn.execute(text("SELECT get_brannstasjoner();"))
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
 
+def get_fylke_bbox_3857(engine, fylke_id):
+    """Return (minx, miny, maxx, maxy) in EPSG:3857 for a county."""
+    with engine.connect() as conn:
+        row = conn.execute(text("""
+            SELECT * FROM get_fylke_bbox_3857(:fylke_id);
+        """), {"fylke_id": fylke_id}).fetchone()
+        return tuple(row) if row else None
 
-    #Der er 15 fylker å velge mellom. Fylke_id er en integer mellom 1 og 15, hvor 1 er Oslo og 15 er Troms og Finnmark.
-def get_brannstasjoner_within_fylke(engine, fylke_id):
+def get_shelters_within_fylke(engine, fylke_id):
     with engine.connect() as conn:
         result = conn.execute(text("""
-            SELECT json_build_object(
-                'type', 'FeatureCollection',
-                'fylke_navn', (SELECT navn FROM public.fylker WHERE id = :fylke_id),
-                'features', COALESCE(json_agg(
-                    json_build_object(
-                        'type', 'Feature',
-                        'geometry', ST_AsGeoJSON(geom)::json,
-                        'properties', to_jsonb(t.*) - 'geom'
-                    )
-                ), '[]'::json)
-            ) AS geojson
-            FROM (
-                SELECT *
-                FROM public.brannstasjoner b
-                WHERE ST_Within(
-                    b.geom,
-                    (SELECT geomfylke FROM public.fylker WHERE id = :fylke_id)
-                )) t;
+            SELECT get_shelters_within_fylke(:fylke_id);
         """), {"fylke_id": fylke_id})
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
 
+def get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y, road_types=None):
+    min_lng, min_lat = web_mercator_to_wgs84(min_x, min_y)
+    max_lng, max_lat = web_mercator_to_wgs84(max_x, max_y)
+
+    with engine.connect() as conn:
+        road_types_array = list(road_types) if road_types else None
+        result = conn.execute(text("""
+            SELECT get_nvdb_roads_geojson(:min_lng, :min_lat, :max_lng, :max_lat, :road_types);
+        """), {
+            "min_lng": min_lng,
+            "min_lat": min_lat,
+            "max_lng": max_lng,
+            "max_lat": max_lat,
+            "road_types": road_types_array
+        })
+        row = result.fetchone()
+        return row[0] if row else {"type": "FeatureCollection", "features": []}
+
+
+def get_k_nearest_shelters(engine, lat: float, lng: float, k: int = 10):
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT get_k_nearest_shelters(:lat, :lng, :k);
+        """), {"lat": lat, "lng": lng, "k": k})
+        row = result.fetchone()
+        return row[0] if row else {"type": "FeatureCollection", "features": []}

@@ -1,12 +1,13 @@
-﻿// Use the global provided by the CDN instead of importing a node-style package
-import type * as MaplibreGL from 'maplibre-gl';
+﻿import type * as MaplibreGL from 'maplibre-gl';
 import {
   AddLayerObject,
   LayerSpecification,
   LngLatLike,
   PropertyValueSpecification
 } from "maplibre-gl";
-
+import { registerKonamiCode } from './middleEarth.js';
+import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer} from './layer.js'
+import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
 
 declare global {
   interface Window {
@@ -25,68 +26,12 @@ if (!maplibregl) {
   const map = new maplibregl.Map({
     container: 'map' as string,
     style: '../static/style/mapstyle.json' as string,
-    center: [0, 0] as LngLatLike,
-    zoom: 6 as number,
+    center: [8.0, 59.0] as LngLatLike,
+    zoom: 2 as number,
   });
 
   window.map = map;
-
-  const layersToggle = document.getElementById('layers-toggle');
-  const layersMenu   = document.getElementById('layers-menu');
-
-  // Open / close the dropdown when clicking the toggle button
-  const overlay = document.querySelector('.map-overlay') as HTMLElement | null;
-  layersToggle?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    layersMenu?.classList.toggle('open');
-    overlay?.classList.toggle('dropdown-open');
-    // Align dropdown to span the full overlay width
-    if (layersMenu?.classList.contains('open') && overlay) {
-      const overlayRect = overlay.getBoundingClientRect();
-      layersMenu.style.top = overlayRect.bottom + 'px';
-      layersMenu.style.left = overlayRect.left + 'px';
-      layersMenu.style.width = overlayRect.width + 'px';
-    }
-  });
-  document.addEventListener('click', () => {
-    layersMenu?.classList.remove('open');
-    overlay?.classList.remove('dropdown-open');
-  });
-  // Prevent clicks inside the menu from closing it
-  layersMenu?.addEventListener('click', (e) => e.stopPropagation());
-
-  /**
-   * Register a map layer in the Layers dropdown so the user can toggle it.
-   *
-   * @param layerId   – The MapLibre layer id to toggle visibility for.
-   * @param label     – Human-readable label shown in the menu.
-   * @param visible   – Whether the layer starts visible (default true).
-   */
-  function registerLayer(layerId: string, label: string, visible: boolean = true) {
-    if (!layersMenu) return;
-
-    // Remove the "no layers" placeholder if present
-    const empty = layersMenu.querySelector('.dropdown-empty');
-    if (empty) empty.remove();
-
-    const item = document.createElement('label');
-    item.className = 'dropdown-item prevent-select';
-
-    const cb = document.createElement('input');
-    cb.type = 'checkbox';
-    cb.checked = visible;
-
-    cb.addEventListener('change', () => {
-      map.setLayoutProperty(layerId, 'visibility', cb.checked ? 'visible' : 'none');
-    });
-
-    const span = document.createElement('span');
-    span.textContent = label;
-
-    item.appendChild(cb);
-    item.appendChild(span);
-    layersMenu.appendChild(item);
-  }
+  registerKonamiCode(map);
 
   const geolocate = new maplibregl.GeolocateControl({
     positionOptions: { enableHighAccuracy: true as boolean },
@@ -108,6 +53,34 @@ if (!maplibregl) {
   const scale = new maplibregl.ScaleControl({ maxWidth: 320, unit: 'metric' });
   map.addControl(scale, 'bottom-left');
 
+  // Shortest path button handler
+  const shortestPathBtn = document.getElementById('shortest-path-btn');
+  if (shortestPathBtn) {
+    shortestPathBtn.addEventListener('click', async () => {
+      const loadingBar = shortestPathBtn.querySelector('.loading-bar') as HTMLElement;
+      loadingBar?.classList.add('active');
+
+      let lat = geolocate && (geolocate as any)._lastKnownPosition?.coords?.latitude;
+      let lng = geolocate && (geolocate as any)._lastKnownPosition?.coords?.longitude;
+
+      if (!lat || !lng) {
+        const center = map.getCenter();
+        lat = center.lat;
+        lng = center.lng;
+      }
+
+      await calculateAndDisplayPath(map, lat, lng);
+      loadingBar?.classList.remove('active');
+    });
+  }
+
+  // Clear path button handler
+  const clearPathBtn = document.getElementById('clear-path-btn');
+  if (clearPathBtn) {
+    clearPathBtn.addEventListener('click', () => {
+      clearPath(map);
+    });
+  }
 
   map.on('style.load', () => {
     map.setProjection({
@@ -141,7 +114,7 @@ if (!maplibregl) {
 
     // Maximum light intensity when fully zoomed out (globe view)
     // Maximum atmosphere-blend when fully zoomed out (1.0 = full atmosphere glow)
-    const  LIGHT_INTENSITY_MAX : number = 1.0 as number;
+    const LIGHT_INTENSITY_MAX : number = 1.0 as number;
     const ATMOSPHERE_BLEND_MAX : number = 1.0 as number;
 
     // Zoom range over which globe effects (light, atmosphere, dark colors)
@@ -262,70 +235,12 @@ if (!maplibregl) {
         ]);
       }
     }
-
-    async function loadFylkerSequentially() {
-  const fylkeIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
-
-  for (const fylkeId of fylkeIds) {
-    try {
-      const res = await fetch(`/api/fylke/${fylkeId}`);
-      const geojson = await res.json();
-
-      const sourceId = `brannstasjoner-fylke-${fylkeId}`;
-      const layerId = `brannstasjoner-circle-${fylkeId}`;
-      const fylkeNavn = geojson.fylke_navn || `Fylke ${fylkeId}`;
-
-      map.addSource(sourceId, { type: 'geojson', data: geojson });
-
-      map.addLayer({
-        id: layerId,
-        type: 'circle',
-        source: sourceId,
-        paint: {
-          'circle-radius': 6,
-          'circle-color': '#e74c3c',
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#ffffff',
-        },
-      });
-
-      registerLayer(layerId, `Brannstasjoner Fylke ${fylkeNavn}`, true);
-
-      // Add event listeners (same as before)
-      map.on('click', layerId, (e) => {
-        if (!e.features || e.features.length === 0) return;
-        const feature = e.features[0];
-        const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
-        const props = feature.properties || {} as Record<string, string>;
-
-        const html = `
-          <div style="font-family: sans-serif; max-width: 260px;">
-            <h3 style="margin: 0 0 6px 0; font-size: 14px;">${props.brannstasjon || 'Ukjent stasjon'}</h3>
-            ${props.brannvesen ? `<p style="margin: 2px 0;"><strong>Brannvesen:</strong> ${props.brannvesen}</p>` : ''}
-            ${props.stasjonstype ? `<p style="margin: 2px 0;"><strong>Stasjonstype:</strong> ${props.stasjonstype}</p>` : ''}
-            ${props.kasernert ? `<p style="margin: 2px 0;"><strong>Kasernert:</strong> ${props.kasernert}</p>` : ''}
-            <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
-          </div>`;
-
-        while (Math.abs(e.lngLat.lng - coords[0]) > 180) {
-          coords[0] += e.lngLat.lng > coords[0] ? 360 : -360;
-        }
-
-        new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
-      });
-
-      map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
-      map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
-
-      // Optional: add a small delay between requests
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-    } catch (err) {
-      console.error(`Failed to load brannstasjoner for fylke ${fylkeId}:`, err);
-    }
+    const fylkeIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    (async () => {
+      await AddShelterLayerGeospatial(map, fylkeIds);
+      AddDSBWmsLayers(map);
+      AddVannOgVassdragLayers(map);
+      AddFKBVeiLayer(map);
+    })().catch(err => console.error('Error loading layers:', err));
   }
-}
-
-loadFylkerSequentially();
-
-})}
+)}
