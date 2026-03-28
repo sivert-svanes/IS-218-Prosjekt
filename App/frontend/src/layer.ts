@@ -258,9 +258,10 @@ export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: n
         const feature = e.features[0];
         const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
         const props = feature.properties || {} as Record<string, string>;
+        const fid = props.fid || '';
 
         const html = `
-          <div style="font-family: sans-serif; max-width: 260px;">
+          <div id="s_${fid}" style="font-family: sans-serif; max-width: 260px;">
             <h3 style="margin: 0 0 6px 0; font-size: 14px;">Tilfluktsrom - ${props.romnr || 'Ukjent adresse'}</h3>
             ${props.plasser ? `<p style="margin: 2px 0;"><strong>Kapasitet:</strong> ${props.plasser} personer</p>` : ''}
             ${props.adresse ? `<p style="margin: 2px 0;"><strong>Adresse:</strong> ${props.adresse}</p>` : ''}
@@ -295,8 +296,9 @@ export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: n
  * @param map The MapLibre map instance
  * @param coordinates Array of [lng, lat] coordinates forming the path
  * @param destinationShelterFylkeId The fylke ID where the shelter is located (optional)
+ * @param shelterFeature The shelter feature to display popup for (optional)
  */
-export function AddShortestPathLayer(map: MaplibreGL.Map, coordinates: [number, number][], destinationShelterFylkeId?: number): void {
+export function AddShortestPathLayer(map: MaplibreGL.Map, coordinates: [number, number][], destinationShelterFylkeId?: number, shelterFeature?: any): void {
   const sourceId = 'shortest-path-source';
   const layerId = 'shortest-path-layer';
 
@@ -367,6 +369,29 @@ export function AddShortestPathLayer(map: MaplibreGL.Map, coordinates: [number, 
     const shelterLayerId = `shelters-circle-${destinationShelterFylkeId}`;
     if (map.getLayer(shelterLayerId)) {
       map.setLayoutProperty(shelterLayerId, 'visibility', 'visible');
+    }
+  }
+
+  // Trigger the shelter layer click event to open the popup
+  if (shelterFeature && shelterFeature.geometry.type === 'Point' && destinationShelterFylkeId) {
+    const [shelterLng, shelterLat] = shelterFeature.geometry.coordinates as [number, number];
+    const layerId = `shelters-circle-${destinationShelterFylkeId}`;
+
+    // Query the shelter features to find the matching one
+    const features = map.querySourceFeatures(`shelters-fylke-${destinationShelterFylkeId}`);
+    const matchingShelter = features.find(f =>
+      f.geometry.type === 'Point' &&
+      Math.abs((f.geometry as any).coordinates[0] - shelterLng) < 0.0001 &&
+      Math.abs((f.geometry as any).coordinates[1] - shelterLat) < 0.0001
+    );
+
+    if (matchingShelter && map.getLayer(layerId)) {
+      // Fire a click event on the layer with the feature
+      map.fire('click', {
+        lngLat: { lng: shelterLng, lat: shelterLat },
+        point: map.project([shelterLng, shelterLat]),
+        features: [matchingShelter]
+      });
     }
   }
 

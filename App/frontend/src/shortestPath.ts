@@ -214,7 +214,7 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
             pathCoords.unshift([lng, lat]);
             if (pathCoords.length >= 2) {
               const fylkeId = shelterFeature.properties?.fylke_id;
-              AddShortestPathLayer(map, pathCoords, fylkeId);
+              AddShortestPathLayer(map, pathCoords, fylkeId, shelterFeature);
               return;
             }
           }
@@ -239,7 +239,7 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
 
       if (pathCoords.length >= 2) {
         const fylkeId = shelterFeature.properties?.fylke_id;
-        AddShortestPathLayer(map, pathCoords, fylkeId);
+        AddShortestPathLayer(map, pathCoords, fylkeId, shelterFeature);
         return;
       }
     }
