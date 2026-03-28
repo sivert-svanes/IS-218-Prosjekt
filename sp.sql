@@ -117,7 +117,7 @@ RETURNS JSON AS $$
             ),
             '[]'::json
         ),
-        json_build_object('fylke_namn', (SELECT navn FROM public.fylker WHERE id = p_fylke_id))
+        json_build_object('fylke_navn', (SELECT navn FROM public.fylker WHERE id = p_fylke_id))
     )
     FROM (
         SELECT *
