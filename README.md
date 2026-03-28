@@ -146,15 +146,155 @@
 # 3. Deliverable 2 - GIScience og Romling Analyse
 ## 1. Section A
 
-## 2. SECTION B
+## 2. Section B
 
-### 1. Dynamic SQL
+### 1. Overview
+
+**Shortest Path Calculation Process**
+
+The ShelterLog application calculates optimal routes to the nearest emergency shelter through the following process:
+
+1. **User Location & Nearest Shelter Query**
+   - User's current location is obtained via maplibre geolocation
+   - Dynamic SQL query finds the k=10 nearest shelters using PostGIS spatial indexing
+
+2. **Road Network Retrieval**
+   - NVDB road network data is fetched from the database, based on the 
+     - If no road graph is cached
+     - If the cached road graph fails to find a route
+     - The size of the bounding box is based on the haversine distance between the user's location and the nearest shelter
+
+3. **Astar Pathfinding Algorithm**
+   - Astar algorithm finds the shortest path to a shelter
+   - Heuristic function estimates remaining distance to destination
+
+4. **Visualization**
+   - Calculated path is returned as GeoJSON LineString
+   - Path is added as a new layer on the interactive map
+   - Information about the shelter is displayed
+
+### 2. Dynamic SQL
+
+#### How "Find Nearest Shelter" Uses Dynamic SQL
+
+1. **User Geolocation Retrieval**
+   - Frontend (`shortestPath.ts`) requests user's current location using MapLibre's built-in geolocation
+   - Coordinates are obtained as latitude (lat) and longitude (lng)
+
+2. **Dynamic SQL Query Construction**
+   - Frontend sends coordinates to backend: `/api/nearest-shelters?lat=6.77&lng=6.77&k=10`
+   - Backend receives parameters and constructs a dynamic SQL query using PostGIS spatial functions
+
+3. **Example Query Flow**
+   ```sql
+   -- Example call from frontend
+   SELECT get_k_nearest_shelters(
+       p_lat := 6.77,
+       p_lng := 6.77,
+       p_k := 10
+   );
+   ```
+   
+   ```sql
+   -- Snippet from sp.sql
+   CREATE OR REPLACE FUNCTION get_k_nearest_shelters(
+       p_lat FLOAT8,
+       p_lng FLOAT8,
+       p_k INT DEFAULT 10
+   )   
+   RETURNS JSON AS $$
+   SELECT 
+        --GEOJSON FeatureCollection of the nearest shelters, removed for brevity
+   FROM (
+       SELECT *,
+           ST_Distance(posisjon, ST_SetSRID(ST_Point(p_lng, p_lat), 4326)) as dist_m
+       FROM public.shelters
+       ORDER BY posisjon <-> ST_SetSRID(ST_Point(p_lng, p_lat), 4326)
+       LIMIT LEAST(GREATEST(p_k, 1), 50)
+   ) t;
+   $$ LANGUAGE sql IMMUTABLE STRICT;
+   ```
+
+### 3. ST-functions
+
+**PostGIS Spatial Functions in get_nvdb_roads_geojson**
+
+The `get_nvdb_roads_geojson` is a stored function that retrieves road network data from the database, using spatial ST functions.
+
+#### ST_MakeEnvelope - Creating Bounding Box Geometry
+
+1. **Stored Function Snippet**
+    
+    ```sql
+   --Get road graph function snippet
+    CREATE OR REPLACE FUNCTION get_nvdb_roads_geojson(
+        p_min_lng FLOAT8,
+        p_min_lat FLOAT8,
+        p_max_lng FLOAT8,
+        p_max_lat FLOAT8,
+        p_road_types TEXT[] DEFAULT NULL
+    )
+        --GEOJSON FeatureCollection of road, removed for brevity
+        FROM public.nvdb_roads
+        WHERE ST_Intersects(
+            geom_4326,
+            ST_MakeEnvelope(p_min_lng, p_min_lat, p_max_lng, p_max_lat, 4326)
+        )
+        AND (p_road_types IS NULL OR "net.typeveg" = ANY(p_road_types));
+    $$ LANGUAGE sql IMMUTABLE STRICT;
+   ```
+
+1. **Envelope Construction**
+   - Frontend A* function sends bbox coordinates: `min_lng, min_lat, max_lng, max_lat`
+   - Stored function creates rectangular envelope using `ST_MakeEnvelope()`
+   - Geometry boundary defined in the EPSG:4326 coordinate system
+
+2. **Example**
+   ```sql
+   --Envelope snippet
+   ST_MakeEnvelope(p_min_lng, p_min_lat, p_max_lng, p_max_lat, 4326)
+   ```
+   - Creates polygon based on the haversine distance between the user's location and the nearest shelters
+   - Enables efficient spatial comparison with road geometries
+
+#### ST_Intersects - Spatial Intersection Query
+
+1. **Intersection Check**
+   ```sql
+   --Intersection snippet
+   WHERE ST_Intersects(
+       geom_4326,
+       ST_MakeEnvelope(p_min_lng, p_min_lat, p_max_lng, p_max_lat, 4326)
+   )
+   ```
+   - Checks which road segments overlap with requested bbox
+   - Uses spatial index for O(log n) performance instead of O(n) table scan
+   - Returns road graph with segments that intersect the bounding box
+
+### 4. User Interface
+
+**Overview**
+
+The user interface is an interactive map where users can find the nearest shelter
+by clicking a button. The shortest path to a shelter is calculated and displayed..
+
+#### Finding Shelter
+- User clicks the "Find Nearest Shelter" button on the map interface
+- A loading animation is displayed while the application runs the calculation
+    - Especially useful when fetching road graph from the database
 
 
+#### Path Display
+- The shortest path is displayed as a blue line on the map
+- The map is automatically fitted to the bounds of the path
+- Information about the shelter is displayed
 
-### 2. ST-functions
 
-### 3. User Interface
+### 5. Further Improvements
+
+- Routing function does not care about the concept of traffic laws
+- It doesn't care about the concept of road sizes
+- Use OSRM instead of own implementation
 
 
 ## 6. Setup Instructions
