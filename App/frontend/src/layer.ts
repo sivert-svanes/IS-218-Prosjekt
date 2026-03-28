@@ -12,6 +12,34 @@ const maplibregl = window.maplibregl;
 const layersToggle = document.getElementById('layers-toggle');
 const layersMenu   = document.getElementById('layers-menu');
 
+// Map to store checkbox references by layer ID for programmatic updates
+const layerCheckboxes = new Map<string, HTMLInputElement>();
+
+function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLat?: { lng: number; lat: number }): void {
+  const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
+  const props = feature.properties || {} as Record<string, string>;
+  const fid = props.fid || '';
+
+  const html = `
+    <div id="s_${fid}" style="font-family: sans-serif; max-width: 260px;">
+      <h3 style="margin: 0 0 6px 0; font-size: 14px;">Tilfluktsrom - ${props.romnr || 'Ukjent adresse'}</h3>
+      ${props.plasser ? `<p style="margin: 2px 0;"><strong>Kapasitet:</strong> ${props.plasser} personer</p>` : ''}
+      ${props.adresse ? `<p style="margin: 2px 0;"><strong>Adresse:</strong> ${props.adresse}</p>` : ''}
+      <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
+    </div>`;
+
+  // Handle date line wrapping if needed
+  if (lngLat) {
+    while (Math.abs(lngLat.lng - coords[0]) > 180) {
+      coords[0] += lngLat.lng > coords[0] ? 360 : -360;
+    }
+  }
+
+  if (maplibregl) {
+    new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
+  }
+}
+
 /**
  * Backend proxy base URL for WMS tiles.
  * Routing tiles through the backend allows future server-side raster analysis
@@ -99,6 +127,9 @@ function registerLayer(layerId: string, label: string, visible: boolean, map: Ma
   item.appendChild(cb);
   item.appendChild(span);
   layersMenu.appendChild(item);
+
+  // Store checkbox reference for programmatic updates
+  layerCheckboxes.set(layerId, cb);
 }
 
 /**
@@ -256,25 +287,7 @@ export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: n
       map.on('click', layerId, (e) => {
         if (!e.features || e.features.length === 0) return;
         const feature = e.features[0];
-        const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
-        const props = feature.properties || {} as Record<string, string>;
-        const fid = props.fid || '';
-
-        const html = `
-          <div id="s_${fid}" style="font-family: sans-serif; max-width: 260px;">
-            <h3 style="margin: 0 0 6px 0; font-size: 14px;">Tilfluktsrom - ${props.romnr || 'Ukjent adresse'}</h3>
-            ${props.plasser ? `<p style="margin: 2px 0;"><strong>Kapasitet:</strong> ${props.plasser} personer</p>` : ''}
-            ${props.adresse ? `<p style="margin: 2px 0;"><strong>Adresse:</strong> ${props.adresse}</p>` : ''}
-            <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
-          </div>`;
-
-        while (Math.abs(e.lngLat.lng - coords[0]) > 180) {
-          coords[0] += e.lngLat.lng > coords[0] ? 360 : -360;
-        }
-
-        if (maplibregl) {
-          new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
-        }
+        createShelterPopup(map, feature, e.lngLat);
       });
 
       map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
@@ -286,6 +299,22 @@ export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: n
       console.error(`Failed to load shelters for fylke ${fylkeId}:`, err);
     }
   }
+}
+
+function calculateBounds(coordinates: [number, number][]): { minLng: number; maxLng: number; minLat: number; maxLat: number } {
+  let minLng = coordinates[0][0];
+  let maxLng = coordinates[0][0];
+  let minLat = coordinates[0][1];
+  let maxLat = coordinates[0][1];
+
+  for (const [lng, lat] of coordinates) {
+    minLng = Math.min(minLng, lng);
+    maxLng = Math.max(maxLng, lng);
+    minLat = Math.min(minLat, lat);
+    maxLat = Math.max(maxLat, lat);
+  }
+
+  return { minLng, maxLng, minLat, maxLat };
 }
 
 /**
@@ -302,100 +331,57 @@ export function AddShortestPathLayer(map: MaplibreGL.Map, coordinates: [number, 
   const sourceId = 'shortest-path-source';
   const layerId = 'shortest-path-layer';
 
-  // Remove existing layer and source if present
   if (map.getLayer(layerId)) map.removeLayer(layerId);
   if (map.getSource(sourceId)) map.removeSource(sourceId);
 
-  // Add source with path coordinates
   map.addSource(sourceId, {
     type: 'geojson',
     data: {
       type: 'FeatureCollection',
-      features: [{
-        type: 'Feature',
-        geometry: { type: 'LineString', coordinates },
-        properties: {}
-      }]
+      features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates }, properties: {} }]
     }
   });
 
-  // Add layer with styling
   map.addLayer({
     id: layerId,
     type: 'line',
     source: sourceId,
-    paint: {
-      'line-color': '#0378be',
-      'line-width': 4,
-      'line-opacity': 0.9
-    },
-    layout: {
-      'line-join': 'round',
-      'line-cap': 'round'
-    }
+    paint: { 'line-color': '#0378be', 'line-width': 4, 'line-opacity': 0.9 },
+    layout: { 'line-join': 'round', 'line-cap': 'round' }
   });
 
-  let minLng = coordinates[0][0];
-  let maxLng = coordinates[0][0];
-  let minLat = coordinates[0][1];
-  let maxLat = coordinates[0][1];
-
-  for (const [lng, lat] of coordinates) {
-    minLng = Math.min(minLng, lng);
-    maxLng = Math.max(maxLng, lng);
-    minLat = Math.min(minLat, lat);
-    maxLat = Math.max(maxLat, lat);
-  }
-
-  const centerLng = (minLng + maxLng) / 2;
-  const centerLat = (minLat + maxLat) / 2;
+  const bounds = calculateBounds(coordinates);
   const camera = map.cameraForBounds(
-    [[minLng, minLat], [maxLng, maxLat]],
+    [[bounds.minLng, bounds.minLat], [bounds.maxLng, bounds.maxLat]],
     { padding: 100 }
   );
-  const zoomLevel = camera?.zoom ?? 12;
 
   map.once('render', () => {
     map.flyTo({
-      center: [centerLng, centerLat],
-      zoom: zoomLevel,
+      center: [(bounds.minLng + bounds.maxLng) / 2, (bounds.minLat + bounds.maxLat) / 2],
+      zoom: camera?.zoom ?? 12,
       duration: 1500,
       essential: true
     });
+
+    if (destinationShelterFylkeId && shelterFeature?.geometry.type === 'Point') {
+      const shelterLayerId = `shelters-circle-${destinationShelterFylkeId}`;
+
+      if (map.getLayer(shelterLayerId)) {
+        map.setLayoutProperty(shelterLayerId, 'visibility', 'visible');
+
+        const cb = layerCheckboxes.get(shelterLayerId);
+        if (cb) cb.checked = true;
+
+        try {
+          createShelterPopup(map, shelterFeature);
+        } catch (err) {
+          console.error('Error triggering popup:', err);
+        }
+      }
+    }
   });
 
-  // Enable the shelter layer for the destination county
-  if (destinationShelterFylkeId) {
-    const shelterLayerId = `shelters-circle-${destinationShelterFylkeId}`;
-    if (map.getLayer(shelterLayerId)) {
-      map.setLayoutProperty(shelterLayerId, 'visibility', 'visible');
-    }
-  }
-
-  // Trigger the shelter layer click event to open the popup
-  if (shelterFeature && shelterFeature.geometry.type === 'Point' && destinationShelterFylkeId) {
-    const [shelterLng, shelterLat] = shelterFeature.geometry.coordinates as [number, number];
-    const layerId = `shelters-circle-${destinationShelterFylkeId}`;
-
-    // Query the shelter features to find the matching one
-    const features = map.querySourceFeatures(`shelters-fylke-${destinationShelterFylkeId}`);
-    const matchingShelter = features.find(f =>
-      f.geometry.type === 'Point' &&
-      Math.abs((f.geometry as any).coordinates[0] - shelterLng) < 0.0001 &&
-      Math.abs((f.geometry as any).coordinates[1] - shelterLat) < 0.0001
-    );
-
-    if (matchingShelter && map.getLayer(layerId)) {
-      // Fire a click event on the layer with the feature
-      map.fire('click', {
-        lngLat: { lng: shelterLng, lat: shelterLat },
-        point: map.project([shelterLng, shelterLat]),
-        features: [matchingShelter]
-      });
-    }
-  }
-
-  // Show the clear button
   const btn = document.getElementById('clear-path-btn');
   if (btn) btn.style.display = 'flex';
 }
