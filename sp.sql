@@ -1,6 +1,4 @@
-﻿-- Direct k-nearest neighbors function for shelters
--- Returns k nearest shelters as GeoJSON using PostGIS spatial index
-CREATE OR REPLACE FUNCTION get_k_nearest_shelters(
+﻿CREATE OR REPLACE FUNCTION get_k_nearest_shelters(
     p_lat FLOAT8,
     p_lng FLOAT8,
     p_k INT DEFAULT 10
@@ -36,19 +34,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE STRICT;
 
-COMMENT ON FUNCTION get_k_nearest_shelters(FLOAT8, FLOAT8, INT) IS
-'Get k nearest shelters to given coordinates as GeoJSON FeatureCollection.
-
-Uses PostGIS spatial index for O(log n) lookup via distance operator (<->).
-
-Parameters: p_lat, p_lng (WGS84), p_k (default 10, max 50)
-
-Returns: GeoJSON FeatureCollection with k nearest shelters, sorted by distance.
-
-Example: SELECT * FROM get_k_nearest_shelters(59.5, 8.0, 10);';
-
--- NVDB roads query function
--- Returns road segments as GeoJSON within a bounding box
 CREATE OR REPLACE FUNCTION get_nvdb_roads_geojson(
     p_min_lng FLOAT8,
     p_min_lat FLOAT8,
@@ -81,16 +66,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE STRICT;
 
-COMMENT ON FUNCTION get_nvdb_roads_geojson(FLOAT8, FLOAT8, FLOAT8, FLOAT8, TEXT[]) IS
-'Get NVDB road segments as GeoJSON within a bounding box (WGS84).
 
-Parameters: p_min_lng, p_min_lat, p_max_lng, p_max_lat (bounding box in EPSG:4326), p_road_types (optional filter array)
-
-Returns: GeoJSON FeatureCollection with road segments, sorted by distance.
-
-Example: SELECT * FROM get_nvdb_roads_geojson(8.0, 59.0, 9.0, 60.0, ARRAY[''Enkel bilveg'', ''Bilferje'']);';
-
--- Brannstasjoner (fire stations) query
 CREATE OR REPLACE FUNCTION get_brannstasjoner()
 RETURNS JSON AS $$
 BEGIN
@@ -114,14 +90,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE STRICT;
 
-COMMENT ON FUNCTION get_brannstasjoner() IS
-'Get all fire stations as GeoJSON FeatureCollection (limited to 1000).
-
-Returns: GeoJSON FeatureCollection with fire station locations.
-
-Example: SELECT * FROM get_brannstasjoner();';
-
--- Fylke (county) bounding box in Web Mercator
 CREATE OR REPLACE FUNCTION get_fylke_bbox_3857(p_fylke_id INT)
 RETURNS TABLE(minx FLOAT8, miny FLOAT8, maxx FLOAT8, maxy FLOAT8) AS $$
 BEGIN
@@ -132,16 +100,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql IMMUTABLE STRICT;
 
-COMMENT ON FUNCTION get_fylke_bbox_3857(INT) IS
-'Get bounding box of a fylke (county) in Web Mercator projection (EPSG:3857).
-
-Parameters: p_fylke_id - County ID
-
-Returns: Tuple of (minx, miny, maxx, maxy) coordinates, or empty if not found.
-
-Example: SELECT * FROM get_fylke_bbox_3857(5);';
-
--- Shelters within a fylke
 CREATE OR REPLACE FUNCTION get_shelters_within_fylke(p_fylke_id INT)
 RETURNS JSON AS $$
 BEGIN
@@ -177,3 +135,39 @@ Parameters: p_fylke_id - County ID
 Returns: GeoJSON FeatureCollection with county name and shelter locations.
 
 Example: SELECT * FROM get_shelters_within_fylke(5);';
+
+COMMENT ON FUNCTION get_fylke_bbox_3857(INT) IS
+'Get bounding box of a fylke (county) in Web Mercator projection (EPSG:3857).
+
+Parameters: p_fylke_id - County ID
+
+Returns: Tuple of (minx, miny, maxx, maxy) coordinates, or empty if not found.
+
+Example: SELECT * FROM get_fylke_bbox_3857(5);';
+
+COMMENT ON FUNCTION get_brannstasjoner() IS
+'Get all fire stations as GeoJSON FeatureCollection (limited to 1000).
+
+Returns: GeoJSON FeatureCollection with fire station locations.
+
+Example: SELECT * FROM get_brannstasjoner();';
+
+COMMENT ON FUNCTION get_nvdb_roads_geojson(FLOAT8, FLOAT8, FLOAT8, FLOAT8, TEXT[]) IS
+'Get NVDB road segments as GeoJSON within a bounding box (WGS84).
+
+Parameters: p_min_lng, p_min_lat, p_max_lng, p_max_lat (bounding box in EPSG:4326), p_road_types (optional filter array)
+
+Returns: GeoJSON FeatureCollection with road segments, sorted by distance.
+
+Example: SELECT * FROM get_nvdb_roads_geojson(8.0, 59.0, 9.0, 60.0, ARRAY[''Enkel bilveg'', ''Bilferje'']);';
+
+COMMENT ON FUNCTION get_k_nearest_shelters(FLOAT8, FLOAT8, INT) IS
+'Get k nearest shelters to given coordinates as GeoJSON FeatureCollection.
+
+Uses PostGIS spatial index for O(log n) lookup via distance operator (<->).
+
+Parameters: p_lat, p_lng (WGS84), p_k (default 10, max 50)
+
+Returns: GeoJSON FeatureCollection with k nearest shelters, sorted by distance.
+
+Example: SELECT * FROM get_k_nearest_shelters(59.5, 8.0, 10);';
