@@ -287,3 +287,65 @@ export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: n
   }
 }
 
+/**
+ * Adds the shortest path layer to the map with a green line.
+ * Removes any existing shortest path layer/source first.
+ * @param map The MapLibre map instance
+ * @param coordinates Array of [lng, lat] coordinates forming the path
+ */
+export function AddShortestPathLayer(map: MaplibreGL.Map, coordinates: [number, number][]): void {
+  const sourceId = 'shortest-path-source';
+  const layerId = 'shortest-path-layer';
+
+  // Remove existing layer and source if present
+  if (map.getLayer(layerId)) map.removeLayer(layerId);
+  if (map.getSource(sourceId)) map.removeSource(sourceId);
+
+  // Add source with path coordinates
+  map.addSource(sourceId, {
+    type: 'geojson',
+    data: {
+      type: 'FeatureCollection',
+      features: [{
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates },
+        properties: {}
+      }]
+    }
+  });
+
+  // Add layer with styling
+  map.addLayer({
+    id: layerId,
+    type: 'line',
+    source: sourceId,
+    paint: {
+      'line-color': '#0378be',
+      'line-width': 4,
+      'line-opacity': 0.9
+    },
+    layout: {
+      'line-join': 'round',
+      'line-cap': 'round'
+    }
+  });
+
+  // Show the clear button
+  const btn = document.getElementById('clear-path-btn');
+  if (btn) btn.style.display = 'flex';
+}
+
+/**
+ * Removes the shortest path layer and source from the map.
+ * @param map The MapLibre map instance
+ */
+export function ClearShortestPathLayer(map: MaplibreGL.Map): void {
+  const sourceId = 'shortest-path-source';
+  const layerId = 'shortest-path-layer';
+
+  if (map.getLayer(layerId)) map.removeLayer(layerId);
+  if (map.getSource(sourceId)) map.removeSource(sourceId);
+
+  const btn = document.getElementById('clear-path-btn');
+  if (btn) btn.style.display = 'none';
+}
