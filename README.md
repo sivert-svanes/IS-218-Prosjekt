@@ -1,36 +1,123 @@
-# IS-218-Prosjekt
+# ShelterLog – Emergency Shelter Routing System
 
-## 0. Introduction – ShelterLog
+## 1. Project Overview
 
-Our goal is to display public shelters and their current supplies on the map. The system will recognize locations with low supply
-and provide routes to get supplies, accounting for threats.
+**ShelterLog** is an interactive map application that locates public emergency shelters and calculates optimal routes to the nearest shelter based on your current location. The system integrates real-time geospatial data with pathfinding algorithms to provide users with quick access to critical shelter resources during emergencies.
 
-## 1. Demo
+## 2. Demo
 
-[Totally an issue](https://github.com/user-attachments/assets/8ae4a56b-81f2-4691-b293-9cc92c3a3474)
+[System demonstration](https://github.com/user-attachments/assets/8ae4a56b-81f2-4691-b293-9cc92c3a3474)
 
-## 2. Dependencies
+## 3. Technical Stack
 
-- NodeJS
-  - Typescript | ^4.9.5
-  - MaplibreGL-gl | ^4.7.1
-- Miniconda
-  - Flask | ^3.1.3
-  - SQLAlchemy | ^2.0.46
-  - GeoAlchemy2 | ^0.18.1
+### Frontend
+| Component | Version |
+|-----------|---------|
+| TypeScript | ^4.9.5 |
+| MapLibre GL | ^4.7.1 |
+| Node.js | Latest LTS |
 
-## 3. Setup
+### Backend
+| Component | Version |
+|-----------|---------|
+| Python | 3.10+ |
+| Flask | ^3.1.3 |
+| SQLAlchemy | ^2.0.46 |
+| GeoAlchemy2 | ^0.18.1 |
 
- 1. Clone repo
-   ```powershell
-    git clone https://github.com/sivert-svanes/IS-218-Prosjekt.git
-   ```
+### Database
+| Component | Version |
+|-----------|---------|
+| PostgreSQL | 15+ |
+| PostGIS | 3.3+ |
+
+## 4. Data Catalog
+
+| Dataset             | Source                                                                                                                  | Format  | Processing                                                     |
+|---------------------|-------------------------------------------------------------------------------------------------------------------------|---------|----------------------------------------------------------------|
+| Emergency Shelters  | [GeoNorge](https://kartkatalog.geonorge.no/metadata/brannstasjoner/0ccce81d-a72e-46ca-8bd9-57b362376485)                | GML     | Converted to PostGIS geometry, indexed for spatial queries     |
+| Road Network (NVDB) | [Statens Vegvesen](https://www.vegvesen.no/)                                                                            | CSV     | Imported as PostGIS geometry with spatial indexing for routing |
+| County Boundaries   | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) | GeoJSON | Converted to PostGIS polygons for administrative filtering     |
+| Map Style           | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           | JSON    | Applied globe projection and custom styling                    |
+
+## 5. Architecture Overview
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                Frontend (TypeScript/MapLibre)               │
+│   ┌──────────────────────────────────────────────────────┐  │
+│   │  Interactive Map Display & User Interaction Layer    │  │
+│   │  - Geolocation & Real-time Position Tracking         │  │
+│   │  - Shortest Path Visualization                       │  │
+│   │  - Shelter Layer & County Filtering                  │  │
+│   └──────────────────────────────────────────────────────┘  │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ HTTP REST API
+┌──────────────────────▼──────────────────────────────────────┐
+│                 Backend (Flask/Python)                      │
+│   ┌──────────────────────────────────────────────────────┐  │
+│   │  API Endpoints:                                      │  │
+│   │  - /api/fylke/{id} - Get shelters by county          │  │
+│   │  - /api/nearest-shelters - Find k-nearest shelters   │  │
+│   │  - /api/shortest-path - Calculate optimal route      │  │
+│   │  - /api/nvdb/roads - Query road network data         │  │
+│   └──────────────────────────────────────────────────────┘  │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ SQL Queries & Stored Procedures
+┌──────────────────────▼──────────────────────────────────────┐
+│            PostgreSQL + PostGIS Database                    │
+│   ┌──────────────────────────────────────────────────────┐  │
+│   │  Tables:                                             │  │
+│   │  - shelters (emergency shelter locations)            │  │
+│   │  - nvdb_roads (road network geometry)                │  │
+│   │  - fylker (county administrative boundaries)         │  │
+│   │                                                      │  │
+│   │  Spatial Indexes:                                    │  │
+│   │  - GiST/BRIN indexes on geometry columns             │  │
+│   │  - Stored Functions for spatial calculations         │  │
+│   └──────────────────────────────────────────────────────┘  │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Data Flow:**
+1. User requests current location → Frontend sends lat/lng to backend
+2. Backend queries nearest shelters using k-NN spatial queries
+3. Backend calculates shortest path using A* algorithm on road network
+4. Results returned as GeoJSON to frontend
+5. Frontend visualizes path and shelter locations on interactive map
+
+# 2. Deliverable 1 - Reflection and Future Improvements
+
+## 1. Further Improvements
+
+- base back-end of the project
+  - Begin creating a more robust front-end
+- Switch to more relevant dataset
+  - Remove firestations dataset
+  - Add shelters dataset
+  - Add API for large emergency network coverage data
+  - Calculate or use dataset for flooding zones
+  - Road graph
+  - Point data for grocerys stores, pharmacies, etc.
+- code in Main.ts will need to be refactored, as it currently has too much responsibility.
+  - Split layer handling into seperate file
+  - Split maprender into seperate file
+- Use compiled PLpgSQL functions and procedures instead of raw SQL.
+  - extract all sql queries into a seperate stored functions or prodecures
+  - use the stored functions and procedures in the backend instead of raw SQL
+
+## 6. Setup Instructions
+
+### Clone Repository
+```powershell
+git clone https://github.com/sivert-svanes/IS-218-Prosjekt.git
+```
 
 > [!IMPORTANT]
 > <details>
-> <summary style="font-size: 14px; font-weight: bold">1. Using build.py </summary>
+> <summary style="font-size: 14px; font-weight: bold">1. Using build.py</summary>
 > 1. In root directory run build.py
-> 
+>
 > Use this unless it breaks (It likes to break, and never in the same way)
 >
 >    ```powershell
@@ -38,76 +125,55 @@ and provide routes to get supplies, accounting for threats.
 >    ```
 > </details>
 
-
 > [!IMPORTANT]
 > <details>
-> <summary style="font-size: 14px; font-weight: bold">2. Manual setup </summary>
+> <summary style="font-size: 14px; font-weight: bold">2. Manual Setup</summary>
 >
+> #### 1. Compile TypeScript
+> 1. CD to frontend folder
+>     ```powershell
+>     cd App\frontend
+>     ```
+> 2. Install dependencies
+>     ```powershell
+>     npm install
+>     ```
+> 3. Compile typescript
+>     ```powershell
+>     npm run build
+>     ```
 >
-> 1. Compile typescript
->     1. CD to frontend folder
->         ```powershell
->         cd App\frontend
+> #### 2. Setup Python Environment
+> 1. CD root folder
+> 2. Setup virtual env
+>    1. Create virtual env
+>       ```powershell
+>       py -3 -m venv .venv
+>       ```
+>    2. Activate virtual env
+>        ```powershell
+>        .venv\Scripts\activate
 >        ```
->     2. Install dependencies
->         ```powershell
->         npm install
->        ```
->     3. Compile typescript
->         ```powershell
->        npm run build
->        ```
-> 2. Setup python environment
->    1. CD root folder
->    2. Setup virtual env
->       1. Create virtual env
->          ```powershell
->          py -3 -m venv .venv
->          ```
->       2. Activate virtual env
->            ```powershell
->            .venv\Scripts\activate
->            ```
->     3. Install dependencies
->         1. Install Flask
->               ```powershell
->               pip install Flask
->               ```
-> 3. Setup envorinment variables
->     1. In the root folder create a .env file, e.g.:
->         ```bash
->         touch .env
->         ```
->         ```powershell
->         echo > .env
->         ```
->     2. Add the following line to the .env file
->         ```bash
->         DATABASE_URL=[DATABASECONNECTIONSTRING]
->         ```
->        
-> 4. Start server, from root folder
+> 3. Install dependencies
+>     ```powershell
+>     pip install Flask SQLAlchemy GeoAlchemy2
+>     ```
+>
+> #### 3. Setup Environment Variables
+> 1. In the root folder create a .env file:
+>     ```powershell
+>     echo > .env
+>     ```
+> 2. Add the following line to the .env file
+>     ```
+>     DATABASE_URL=postgresql://user:password@localhost/shelterlog
+>     ```
+>
+> #### 4. Start Server
+> From root folder:
 >   ```powershell
 >     flask --app .\App\app.py run --debug
->     ```
-> </details>
+>  ```
+</details>
 
-## 4. Data sources
-
-| Description   | Format  | Modifications    | Source                                                                                                                  |
-|---------------|---------|------------------|-------------------------------------------------------------------------------------------------------------------------|
-| Map style     | JSON    | Globe projection | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           |
-| Counties      | GeoJson | -> PostGIS       | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) |
-| Fire stations | GML     | -> PostGIS       | [GeoNorge](https://kartkatalog.geonorge.no/metadata/brannstasjoner/0ccce81d-a72e-46ca-8bd9-57b362376485)                |
-
-## 5. Further additions
-
-Currently, this is only this is only the base back-end of the project. Going forward, we will switch to a dateset that is relevant
-to the goals of the project. Some code in Main.ts will need to be refactored, as it currently has too much responsibility.
-We should also switch to using compiled plsql functions and procedures instead of raw SQL.
-
-## 4. Arkitekturskisse
-<img width="722" height="912" alt="Arkitekturskisse(2)" src="https://github.com/user-attachments/assets/10ae8510-8e08-4c8c-8987-cc83ab4ec3df" />
-
-
-![Jork IT](https://media1.tenor.com/m/grh1asJHzg4AAAAC/freaky.gif)
+**Status**: Active Development | **Last Updated**: March 2026
