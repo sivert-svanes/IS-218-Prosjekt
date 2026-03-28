@@ -114,7 +114,7 @@ if (!maplibregl) {
 
     // Maximum light intensity when fully zoomed out (globe view)
     // Maximum atmosphere-blend when fully zoomed out (1.0 = full atmosphere glow)
-    const  LIGHT_INTENSITY_MAX : number = 1.0 as number;
+    const LIGHT_INTENSITY_MAX : number = 1.0 as number;
     const ATMOSPHERE_BLEND_MAX : number = 1.0 as number;
 
     // Zoom range over which globe effects (light, atmosphere, dark colors)

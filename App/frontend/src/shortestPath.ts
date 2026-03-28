@@ -1,4 +1,5 @@
 ﻿import type * as MaplibreGL from "maplibre-gl";
+import { AddShortestPathLayer, ClearShortestPathLayer } from "./layer.js";
 
 let roadNetworkCache: any = null;
 const WGS84_CONSTANT = 20037508.34;
@@ -23,8 +24,6 @@ const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: numbe
   const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 };
-
-
 
 async function ensureRoadNetworkLoaded(map: MaplibreGL.Map, userLat: number, userLng: number, shelterLat: number, shelterLng: number): Promise<void> {
   // Calculate haversine distance to shelter
@@ -189,30 +188,6 @@ function buildPathCoordinates(path: string[], graph: Map<string, GraphNode>, end
   return coords;
 }
 
-function updateLayerOnMap(map: MaplibreGL.Map, coords: [number, number][]): void {
-  const sourceId = 'shortest-path-source';
-  const layerId = 'shortest-path-layer';
-
-  if (map.getLayer(layerId)) map.removeLayer(layerId);
-  if (map.getSource(sourceId)) map.removeSource(sourceId);
-
-  map.addSource(sourceId, {
-    type: 'geojson',
-    data: { type: 'FeatureCollection', features: [{ type: 'Feature', geometry: { type: 'LineString', coordinates: coords }, properties: {} }] }
-  });
-
-  map.addLayer({
-    id: layerId,
-    type: 'line',
-    source: sourceId,
-    paint: { 'line-color': '#00FF00', 'line-width': 4, 'line-opacity': 0.9 },
-    layout: { 'line-join': 'round', 'line-cap': 'round' }
-  });
-
-  const btn = document.getElementById('clear-path-btn');
-  if (btn) btn.style.display = 'flex';
-}
-
 export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, lng: number): Promise<void> {
   try {
     // Get k=10 nearest shelters from database
@@ -238,7 +213,7 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
             let pathCoords = buildPathCoordinates(path, graph, [shelter.lng, shelter.lat]);
             pathCoords.unshift([lng, lat]);
             if (pathCoords.length >= 2) {
-              updateLayerOnMap(map, pathCoords);
+              AddShortestPathLayer(map, pathCoords);
               return;
             }
           }
@@ -262,7 +237,7 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
       pathCoords.unshift([lng, lat]);
 
       if (pathCoords.length >= 2) {
-        updateLayerOnMap(map, pathCoords);
+        AddShortestPathLayer(map, pathCoords);
         return;
       }
     }
@@ -274,12 +249,5 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
 }
 
 export function clearPath(map: MaplibreGL.Map): void {
-  const layerId = 'shortest-path-layer';
-  const sourceId = 'shortest-path-source';
-
-  if (map.getLayer(layerId)) map.removeLayer(layerId);
-  if (map.getSource(sourceId)) map.removeSource(sourceId);
-
-  const btn = document.getElementById('clear-path-btn');
-  if (btn) btn.style.display = 'none';
+  ClearShortestPathLayer(map);
 }
