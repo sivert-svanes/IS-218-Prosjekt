@@ -46,3 +46,134 @@ Parameters: p_lat, p_lng (WGS84), p_k (default 10, max 50)
 Returns: GeoJSON FeatureCollection with k nearest shelters, sorted by distance.
 
 Example: SELECT * FROM get_k_nearest_shelters(59.5, 8.0, 10);';
+
+-- NVDB roads query function
+-- Returns road segments as GeoJSON within a bounding box
+CREATE OR REPLACE FUNCTION get_nvdb_roads_geojson(
+    p_min_lng FLOAT8,
+    p_min_lat FLOAT8,
+    p_max_lng FLOAT8,
+    p_max_lat FLOAT8,
+    p_road_types TEXT[] DEFAULT NULL
+)
+RETURNS JSON AS $$
+BEGIN
+    RETURN (
+        SELECT json_build_object(
+            'type', 'FeatureCollection',
+            'features', COALESCE(json_agg(
+                json_build_object(
+                    'type', 'Feature',
+                    'geometry', ST_AsGeoJSON(ST_Force2D(geom_4326))::json,
+                    'properties', json_build_object(
+                        'typeVeg', "net.typeveg"
+                    )
+                )
+            ), '[]'::json)
+        ) AS geojson
+        FROM public.nvdb_roads
+        WHERE ST_Intersects(
+            geom_4326,
+            ST_MakeEnvelope(p_min_lng, p_min_lat, p_max_lng, p_max_lat, 4326)
+        )
+        AND (p_road_types IS NULL OR "net.typeveg" = ANY(p_road_types))
+    );
+END;
+$$ LANGUAGE plpgsql IMMUTABLE STRICT;
+
+COMMENT ON FUNCTION get_nvdb_roads_geojson(FLOAT8, FLOAT8, FLOAT8, FLOAT8, TEXT[]) IS
+'Get NVDB road segments as GeoJSON within a bounding box (WGS84).
+
+Parameters: p_min_lng, p_min_lat, p_max_lng, p_max_lat (bounding box in EPSG:4326), p_road_types (optional filter array)
+
+Returns: GeoJSON FeatureCollection with road segments, sorted by distance.
+
+Example: SELECT * FROM get_nvdb_roads_geojson(8.0, 59.0, 9.0, 60.0, ARRAY[''Enkel bilveg'', ''Bilferje'']);';
+
+-- Brannstasjoner (fire stations) query
+CREATE OR REPLACE FUNCTION get_brannstasjoner()
+RETURNS JSON AS $$
+BEGIN
+    RETURN (
+        SELECT json_build_object(
+            'type', 'FeatureCollection',
+            'features', COALESCE(json_agg(
+                json_build_object(
+                    'type', 'Feature',
+                    'geometry', ST_AsGeoJSON(geom)::json,
+                    'properties', to_jsonb(t.*) - 'geom'
+                )
+            ), '[]'::json)
+        ) AS geojson
+        FROM (
+            SELECT *
+            FROM public.brannstasjoner
+            LIMIT 1000
+        ) t
+    );
+END;
+$$ LANGUAGE plpgsql IMMUTABLE STRICT;
+
+COMMENT ON FUNCTION get_brannstasjoner() IS
+'Get all fire stations as GeoJSON FeatureCollection (limited to 1000).
+
+Returns: GeoJSON FeatureCollection with fire station locations.
+
+Example: SELECT * FROM get_brannstasjoner();';
+
+-- Fylke (county) bounding box in Web Mercator
+CREATE OR REPLACE FUNCTION get_fylke_bbox_3857(p_fylke_id INT)
+RETURNS TABLE(minx FLOAT8, miny FLOAT8, maxx FLOAT8, maxy FLOAT8) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT ST_XMin(b), ST_YMin(b), ST_XMax(b), ST_YMax(b)
+    FROM (SELECT ST_Envelope(ST_Transform(geomfylke, 3857)) AS b
+          FROM public.fylker WHERE id = p_fylke_id) t;
+END;
+$$ LANGUAGE plpgsql IMMUTABLE STRICT;
+
+COMMENT ON FUNCTION get_fylke_bbox_3857(INT) IS
+'Get bounding box of a fylke (county) in Web Mercator projection (EPSG:3857).
+
+Parameters: p_fylke_id - County ID
+
+Returns: Tuple of (minx, miny, maxx, maxy) coordinates, or empty if not found.
+
+Example: SELECT * FROM get_fylke_bbox_3857(5);';
+
+-- Shelters within a fylke
+CREATE OR REPLACE FUNCTION get_shelters_within_fylke(p_fylke_id INT)
+RETURNS JSON AS $$
+BEGIN
+    RETURN (
+        SELECT json_build_object(
+            'type', 'FeatureCollection',
+            'fylke_navn', (SELECT navn FROM public.fylker WHERE id = p_fylke_id),
+            'features', COALESCE(json_agg(
+                json_build_object(
+                    'type', 'Feature',
+                    'geometry', ST_AsGeoJSON(posisjon)::json,
+                    'properties', to_jsonb(t.*) - 'posisjon'
+                )
+            ), '[]'::json)
+        ) AS geojson
+        FROM (
+            SELECT *
+            FROM public.shelters b
+            WHERE ST_Within(
+                b.posisjon,
+                (SELECT geomfylke FROM public.fylker WHERE id = p_fylke_id)
+            )
+        ) t
+    );
+END;
+$$ LANGUAGE plpgsql IMMUTABLE STRICT;
+
+COMMENT ON FUNCTION get_shelters_within_fylke(INT) IS
+'Get all shelters within a specific fylke (county) as GeoJSON FeatureCollection.
+
+Parameters: p_fylke_id - County ID
+
+Returns: GeoJSON FeatureCollection with county name and shelter locations.
+
+Example: SELECT * FROM get_shelters_within_fylke(5);';

@@ -72,23 +72,7 @@ def database_test_query(engine):
 
 def get_brannstasjoner(engine):
     with engine.connect() as conn:
-        result = conn.execute(text("""
-            SELECT json_build_object(
-                'type', 'FeatureCollection',
-                'features', COALESCE(json_agg(
-                    json_build_object(
-                        'type', 'Feature',
-                        'geometry', ST_AsGeoJSON(geom)::json,
-                        'properties', to_jsonb(t.*) - 'geom'
-                    )
-                ), '[]'::json)
-            ) AS geojson
-            FROM (
-                SELECT *
-                FROM public.brannstasjoner
-                LIMIT 1000
-            ) t;
-        """))
+        result = conn.execute(text("SELECT get_brannstasjoner();"))
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
 
@@ -96,117 +80,33 @@ def get_fylke_bbox_3857(engine, fylke_id):
     """Return (minx, miny, maxx, maxy) in EPSG:3857 for a county."""
     with engine.connect() as conn:
         row = conn.execute(text("""
-            SELECT ST_XMin(b), ST_YMin(b), ST_XMax(b), ST_YMax(b)
-            FROM (SELECT ST_Envelope(ST_Transform(geomfylke, 3857)) AS b
-                  FROM public.fylker WHERE id = :id) t
-        """), {"id": fylke_id}).fetchone()
+            SELECT * FROM get_fylke_bbox_3857(:fylke_id);
+        """), {"fylke_id": fylke_id}).fetchone()
         return tuple(row) if row else None
-
 
 def get_shelters_within_fylke(engine, fylke_id):
     with engine.connect() as conn:
         result = conn.execute(text("""
-            SELECT json_build_object(
-                'type', 'FeatureCollection',
-                'fylke_navn', (SELECT navn FROM public.fylker WHERE id = :fylke_id),
-                'features', COALESCE(json_agg(
-                    json_build_object(
-                        'type', 'Feature',
-                        'geometry', ST_AsGeoJSON(posisjon)::json,
-                        'properties', to_jsonb(t.*) - 'geom'
-                    )
-                ), '[]'::json)
-            ) AS geojson
-            FROM (
-                SELECT *
-                FROM public.shelters b
-                WHERE ST_Within(
-                    b.posisjon,
-                    (SELECT geomfylke FROM public.fylker WHERE id = :fylke_id)
-                )) t;
+            SELECT get_shelters_within_fylke(:fylke_id);
         """), {"fylke_id": fylke_id})
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
 
-
-def get_nvdb_segments_in_bbox(engine, min_x, min_y, max_x, max_y, road_types=None):
-    """Query pre-loaded NVDB segments from PostGIS.
-    Input bounds are in EPSG:3857 (Web Mercator).
-    Data is stored as geometry in geom_4326 column (EPSG:4326 WGS84).
-
-    Args:
-        engine: SQLAlchemy engine
-        min_x, min_y, max_x, max_y: Bounding box in EPSG:3857
-        road_types: Optional list/set of road type values to filter by (net.typeveg).
-                   If None, all road types are returned.
-    """
-    min_lng, min_lat = web_mercator_to_wgs84(min_x, min_y)
-    max_lng, max_lat = web_mercator_to_wgs84(max_x, max_y)
-
-    with engine.connect() as conn:
-        query = """
-            SELECT geom_4326, "net.typeveg"
-            FROM public.nvdb_roads
-            WHERE ST_Intersects(
-                geom_4326,
-                ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326)
-            )
-        """
-        params = {"minx": min_lng, "miny": min_lat, "maxx": max_lng, "maxy": max_lat}
-
-        if road_types:
-            query += ' AND "net.typeveg" = ANY(:road_types)'
-            params["road_types"] = list(road_types)
-
-        query += ";"
-        result = conn.execute(text(query), params)
-        return result.fetchall()
-
-
 def get_nvdb_as_geojson(engine, min_x, min_y, max_x, max_y, road_types=None):
-    """Get NVDB segments as GeoJSON from PostGIS.
-    Input bounds are in EPSG:3857 (Web Mercator).
-    Data is stored as geometry in geom_4326 column (EPSG:4326 WGS84).
-    Returns GeoJSON in EPSG:4326 (WGS84).
-    Strips Z coordinates for compatibility with MapLibre.
-
-    Args:
-        engine: SQLAlchemy engine
-        min_x, min_y, max_x, max_y: Bounding box in EPSG:3857
-        road_types: Optional list/set of road type values to filter by (net.typeveg).
-                   If None, all road types are returned.
-    """
     min_lng, min_lat = web_mercator_to_wgs84(min_x, min_y)
     max_lng, max_lat = web_mercator_to_wgs84(max_x, max_y)
 
     with engine.connect() as conn:
-        query = """
-            SELECT json_build_object(
-                'type', 'FeatureCollection',
-                'features', COALESCE(json_agg(
-                    json_build_object(
-                        'type', 'Feature',
-                        'geometry', ST_AsGeoJSON(ST_Force2D(geom_4326))::json,
-                        'properties', json_build_object(
-                            'typeVeg', "net.typeveg"
-                        )
-                    )
-                ), '[]'::json)
-            ) AS geojson
-            FROM public.nvdb_roads
-            WHERE ST_Intersects(
-                geom_4326,
-                ST_MakeEnvelope(:minx, :miny, :maxx, :maxy, 4326)
-            )
-        """
-        params = {"minx": min_lng, "miny": min_lat, "maxx": max_lng, "maxy": max_lat}
-
-        if road_types:
-            query += ' AND "net.typeveg" = ANY(:road_types)'
-            params["road_types"] = list(road_types)
-
-        query += ";"
-        result = conn.execute(text(query), params)
+        road_types_array = list(road_types) if road_types else None
+        result = conn.execute(text("""
+            SELECT get_nvdb_roads_geojson(:min_lng, :min_lat, :max_lng, :max_lat, :road_types);
+        """), {
+            "min_lng": min_lng,
+            "min_lat": min_lat,
+            "max_lng": max_lng,
+            "max_lat": max_lat,
+            "road_types": road_types_array
+        })
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
 
@@ -218,5 +118,3 @@ def get_k_nearest_shelters(engine, lat: float, lng: float, k: int = 10):
         """), {"lat": lat, "lng": lng, "k": k})
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
-
-
