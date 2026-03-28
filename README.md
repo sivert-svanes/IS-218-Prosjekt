@@ -281,12 +281,16 @@ The user interface is an interactive map where users can find the nearest shelte
 by clicking a button. The shortest path to a shelter is calculated and displayed..
 
 #### Finding Shelter
+<img width="498" height="74" alt="image" src="https://github.com/user-attachments/assets/4f378327-db70-4119-8899-38e18f29b366" />
+
 - User clicks the "Find Nearest Shelter" button on the map interface
 - A loading animation is displayed while the application runs the calculation
     - Especially useful when fetching road graph from the database
 
 
 #### Path Display
+<img width="1500" height="1191" alt="image" src="https://github.com/user-attachments/assets/46b55aec-b765-4549-959b-9003e17b3989" />
+
 - The shortest path is displayed as a blue line on the map
 - The map is automatically fitted to the bounds of the path
 - Information about the shelter is displayed
@@ -297,7 +301,7 @@ by clicking a button. The shortest path to a shelter is calculated and displayed
 - Routing function does not care about the concept of traffic laws
 - It doesn't care about the concept of road sizes
 - Use OSRM instead of own implementation
-
+- Make UI look nicer
 
 ## 6. Setup Instructions
 
