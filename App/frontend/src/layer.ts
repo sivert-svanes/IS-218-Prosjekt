@@ -327,7 +327,20 @@ function calculateBounds(coordinates: [number, number][]): { minLng: number; max
  * @param destinationShelterFylkeId The fylke ID where the shelter is located (optional)
  * @param shelterFeature The shelter feature to display popup for (optional)
  */
-export function AddShortestPathLayer(map: MaplibreGL.Map, coordinates: [number, number][], destinationShelterFylkeId?: number, shelterFeature?: any): void {
+interface ShelterFeatureProperties {
+  fylkeId: number;
+  [key: string]: unknown;
+}
+
+type ShelterFeature = GeoJSON.Feature<GeoJSON.Point, ShelterFeatureProperties>;
+type ShelterFylkeId = ShelterFeatureProperties['fylkeId'];
+
+export function AddShortestPathLayer(
+  map: MaplibreGL.Map,
+  coordinates: [number, number][],
+  destinationShelterFylkeId?: ShelterFylkeId,
+  shelterFeature?: ShelterFeature
+): void {
   const sourceId = 'shortest-path-source';
   const layerId = 'shortest-path-layer';
 
