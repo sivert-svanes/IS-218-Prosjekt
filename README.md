@@ -172,7 +172,6 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │ Storage:                                            │    │
 │   │  - geom_4326: TOAST Compressed                      │    │
 │   └─────────────────────────────────────────────────────┘    │
-│                                                              │
 └──────────────────────────────────────────────────────────────┘
 ```
 
