@@ -51,7 +51,7 @@ RETURNS JSON AS $$
         LIMIT LEAST(GREATEST(p_k, 1), 50)
     ) t
     LEFT JOIN public.fylker f ON ST_Covers(f.geomfylke, t.posisjon);
-$$ LANGUAGE sql IMMUTABLE STRICT;
+$$ LANGUAGE sql IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION get_nvdb_roads_geojson(
     p_min_lng FLOAT8,
@@ -78,7 +78,7 @@ RETURNS JSON AS $$
         ST_MakeEnvelope(p_min_lng, p_min_lat, p_max_lng, p_max_lat, 4326)
     )
     AND (p_road_types IS NULL OR "net.typeveg" = ANY(p_road_types));
-$$ LANGUAGE sql IMMUTABLE STRICT;
+$$ LANGUAGE sql IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION get_brannstasjoner()
 RETURNS JSON AS $$
