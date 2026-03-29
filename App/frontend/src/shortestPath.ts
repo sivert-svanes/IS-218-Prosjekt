@@ -2,6 +2,7 @@
 import { AddShortestPathLayer, ClearShortestPathLayer } from "./layer.js";
 
 let roadNetworkCache: any = null;
+let roadNetworkCacheBounds: { minLat: number; maxLat: number; minLng: number; maxLng: number } | null = null;
 const WGS84_CONSTANT = 20037508.34;
 const ROAD_TYPES = 'Enkel%20bilveg,Bilferje,Rampe,Rundkj%C3%B8ring,Kanalisert%20veg';
 
@@ -46,13 +47,32 @@ async function ensureRoadNetworkLoaded(map: MaplibreGL.Map, userLat: number, use
     return (isSin ? Math.log(Math.tan(rad)) : deg / 180) * WGS84_CONSTANT;
   };
 
-  const response = await fetch(
-    `/api/nvdb/roads?min_x=${toMercator(minLng, false)}&min_y=${toMercator(minLat, true)}&max_x=${toMercator(maxLng, false)}&max_y=${toMercator(maxLat, true)}&road_types=${ROAD_TYPES}`
-  );
+  const url = `/api/nvdb/roads?min_x=${toMercator(minLng, false)}&min_y=${toMercator(minLat, true)}&max_x=${toMercator(maxLng, false)}&max_y=${toMercator(maxLat, true)}&road_types=${ROAD_TYPES}`;
+  const response = await fetch(url);
 
   if (response.ok) {
     roadNetworkCache = await response.json();
+    roadNetworkCacheBounds = { minLat, maxLat, minLng, maxLng };
   }
+}
+
+function isCacheValid(userLat: number, userLng: number, shelterLat: number, shelterLng: number): boolean {
+  if (!roadNetworkCache || !roadNetworkCacheBounds) {
+    return false;
+  }
+
+  const { minLat, maxLat, minLng, maxLng } = roadNetworkCacheBounds;
+  const userInBounds = userLat >= minLat && userLat <= maxLat && userLng >= minLng && userLng <= maxLng;
+  const shelterInBounds = shelterLat >= minLat && shelterLat <= maxLat && shelterLng >= minLng && shelterLng <= maxLng;
+
+  const valid = userInBounds && shelterInBounds;
+
+  if (!valid) {
+    roadNetworkCache = null;
+    roadNetworkCacheBounds = null;
+  }
+
+  return valid;
 }
 
 function buildRoadGraph(features: any[]): Map<string, GraphNode> {
@@ -201,8 +221,8 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
       const [shelterLng, shelterLat] = shelterFeature.geometry.coordinates;
       const shelter = { lat: shelterLat, lng: shelterLng };
 
-      // Attempt 1: Try with cached road graph if it exists
-      if (roadNetworkCache?.features) {
+      // Attempt 1: Try with cached road graph if it exists and is valid
+      if (isCacheValid(lat, lng, shelter.lat, shelter.lng)) {
         const graph = buildRoadGraph(roadNetworkCache.features);
         const startId = findNearestInGraph(lat, lng, graph);
         const endId = findNearestInGraph(shelter.lat, shelter.lng, graph);
@@ -213,7 +233,8 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
             let pathCoords = buildPathCoordinates(path, graph, [shelter.lng, shelter.lat]);
             pathCoords.unshift([lng, lat]);
             if (pathCoords.length >= 2) {
-              AddShortestPathLayer(map, pathCoords);
+              const fylkeId = shelterFeature.properties?.fylke_id;
+              AddShortestPathLayer(map, pathCoords, fylkeId, shelterFeature);
               return;
             }
           }
@@ -237,12 +258,11 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
       pathCoords.unshift([lng, lat]);
 
       if (pathCoords.length >= 2) {
-        AddShortestPathLayer(map, pathCoords);
+        const fylkeId = shelterFeature.properties?.fylke_id;
+        AddShortestPathLayer(map, pathCoords, fylkeId, shelterFeature);
         return;
       }
     }
-
-    console.warn('Could not find valid path to any of the nearest shelters');
   } catch (err) {
     console.error('Shortest path error:', err);
   }
