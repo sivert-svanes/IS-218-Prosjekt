@@ -33,11 +33,12 @@ RETURNS JSON AS $$
         COALESCE(
             json_agg(
                 build_geojson_feature(
-                    ST_AsGeoJSON(posisjon)::json,
+                    ST_AsGeoJSON(t.posisjon)::json,
                     to_jsonb(json_build_object(
-                        'distance_km', ROUND((dist_m / 1000.0)::numeric, 2)
-                    )) || to_jsonb(t.*) - 'posisjon'
-                ) ORDER BY dist_m
+                        'distance_km', ROUND((t.dist_m / 1000.0)::numeric, 2),
+                        'fylke_id', f.id
+                    )) || to_jsonb(t.*) - 'posisjon' - 'dist_m'
+                ) ORDER BY t.dist_m
             ),
             '[]'::json
         )
@@ -48,8 +49,9 @@ RETURNS JSON AS $$
         FROM public.shelters
         ORDER BY posisjon <-> ST_SetSRID(ST_Point(p_lng, p_lat), 4326)
         LIMIT LEAST(GREATEST(p_k, 1), 50)
-    ) t;
-$$ LANGUAGE sql IMMUTABLE STRICT;
+    ) t
+    LEFT JOIN public.fylker f ON ST_Covers(f.geomfylke, t.posisjon);
+$$ LANGUAGE sql IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION get_nvdb_roads_geojson(
     p_min_lng FLOAT8,
@@ -76,7 +78,7 @@ RETURNS JSON AS $$
         ST_MakeEnvelope(p_min_lng, p_min_lat, p_max_lng, p_max_lat, 4326)
     )
     AND (p_road_types IS NULL OR "net.typeveg" = ANY(p_road_types));
-$$ LANGUAGE sql IMMUTABLE STRICT;
+$$ LANGUAGE sql IMMUTABLE;
 
 CREATE OR REPLACE FUNCTION get_brannstasjoner()
 RETURNS JSON AS $$
