@@ -371,8 +371,9 @@ export function AddShortestPathLayer(
 
   map.once('render', () => {
     map.flyTo({
-      center: [(bounds.minLng + bounds.maxLng) / 2, (bounds.minLat + bounds.maxLat) / 2],
+        center: camera?.center ?? [(bounds.minLng + bounds.maxLng) / 2, (bounds.minLat + bounds.maxLat) / 2],
       zoom: camera?.zoom ?? 12,
+      bearing: camera?.bearing ?? map.getBearing(),
       duration: 1500,
       essential: true
     });
