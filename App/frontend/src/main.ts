@@ -15,6 +15,8 @@ declare global {
     maplibregl?: typeof MaplibreGL;
     // Exposed for debugging
     map?: MaplibreGL.Map;
+    // Debug override for geolocation (for testing with DevTools sensor)
+    debugGeoLocation?: { lat: number; lng: number };
   }
 }
 
@@ -60,8 +62,17 @@ if (!maplibregl) {
       const loadingBar = shortestPathBtn.querySelector('.loading-bar') as HTMLElement;
       loadingBar?.classList.add('active');
 
-      let lat = geolocate && (geolocate as any)._lastKnownPosition?.coords?.latitude;
-      let lng = geolocate && (geolocate as any)._lastKnownPosition?.coords?.longitude;
+      let lat: number | undefined;
+      let lng: number | undefined;
+
+      //Override geolocation, oslo: window.debugGeoLocation = {lat: 59.9139, lng: 10.7522};
+      if (window.debugGeoLocation) {
+        lat = window.debugGeoLocation.lat;
+        lng = window.debugGeoLocation.lng;
+      } else {
+        lat = geolocate && (geolocate as any)._lastKnownPosition?.coords?.latitude;
+        lng = geolocate && (geolocate as any)._lastKnownPosition?.coords?.longitude;
+      }
 
       if (!lat || !lng) {
         const center = map.getCenter();
