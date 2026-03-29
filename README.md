@@ -349,6 +349,7 @@ by clicking a button. The shortest path to a shelter is calculated and displayed
 
 ### 5. Further Improvements
 
+- NEW DATASET! Current doesn't cover Norway, one that does might be too big 
 - Routing function does not care about the concept of traffic laws
 - It doesn't care about the concept of road sizes
 - Use OSRM instead of own implementation
