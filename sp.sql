@@ -50,7 +50,7 @@ RETURNS JSON AS $$
         ORDER BY posisjon <-> ST_SetSRID(ST_Point(p_lng, p_lat), 4326)
         LIMIT LEAST(GREATEST(p_k, 1), 50)
     ) t
-    LEFT JOIN public.fylker f ON ST_Within(t.posisjon, f.geomfylke);
+    LEFT JOIN public.fylker f ON ST_Covers(f.geomfylke, t.posisjon);
 $$ LANGUAGE sql IMMUTABLE STRICT;
 
 CREATE OR REPLACE FUNCTION get_nvdb_roads_geojson(
