@@ -55,6 +55,8 @@ low supply and provide routes to get supplies, accounting for threats.
 
 ## 5. Architecture Overview
 
+## 1. Application Architecture
+
 ```
 ┌──────────────────────────────────────────────────────────────┐
 │                 Frontend (TypeScript/MapLibre)               │
@@ -80,7 +82,7 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - maplibre-gl-augmentations.d.ts: Extended types     │  │
 │   └───────────────────────────────────────────────────────┘  │
 └──────────────────────┬───────────────────────────────────────┘
-                       │ HTTP REST API
+                       │ HTTP API
 ┌──────────────────────▼───────────────────────────────────────┐
 │                  Backend (Flask/Python)                      │
 │   ┌───────────────────────────────────────────────────────┐  │
@@ -91,22 +93,10 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - /api/nvdb/roads - Query road network data          │  │
 │   └───────────────────────────────────────────────────────┘  │
 └──────────────────────┬───────────────────────────────────────┘
-                       │ SQL Queries & Stored Procedures
+                       │ PL/pgSQL Stored Functions
 ┌──────────────────────▼───────────────────────────────────────┐
 │             PostgreSQL + PostGIS Database                    │
 │   ┌───────────────────────────────────────────────────────┐  │
-│   │  Tables:                                              │  │
-│   │  - shelters                                           │  │
-│   │    - Emergency shelter locations                      │  │
-│   │  - nvdb_roads                                         │  │
-│   │    - Road network graph                               │  │
-│   │    - Compressed using TOAST                           │  │
-│   │  - fylker                                             │  │
-│   │    - County administrative boundaries                 │  │
-│   │                                                       │  │
-│   │  Spatial Indexes:                                     │  │
-│   │  - GiST/BRIN indexes on geometry columns              │  │
-│   │                                                       │  │
 │   │  Stored Functions (in sp.sql):                        │  │
 │   │  - get_shelters_within_fylke: Fetch shelters by id    │  │
 │   │  - get_k_nearest_shelters: K-NN spatial search        │  │
@@ -123,6 +113,70 @@ low supply and provide routes to get supplies, accounting for threats.
 3. Backend calculates shortest path using A* algorithm on road network
 4. Results returned as GeoJSON to frontend
 5. Frontend visualizes path and shelter locations on interactive map
+
+## 2. Database Schema
+
+### 1. Database Tables
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│              PostgreSQL + PostGIS Database                   │
+├──────────────────────────────────────────────────────────────┤
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: shelters                                     │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - fid: INTEGER, PK                                 │    │
+│   │  - gmlId: VARCHAR                                   │    │
+│   │  - lokalId: VARCHAR(36)                             │    │
+│   │  - navnerom: VARCHAR(60)                            │    │
+│   │  - versjonId: INTEGER                               │    │
+│   │  - datauttaksdato: TIMESTAMP WITH TIME ZONE         │    │
+│   │  - opphav: VARCHAR(47)                              │    │
+│   │  - romNr: INTEGER                                   │    │
+│   │  - plasser: INTEGER                                 │    │
+│   │  - adresse: VARCHAR(52)                             │    │
+│   │  - posisjon: GEOMETRY(Point, 4326)                  │    │
+│   │  - navn: VARCHAR                                    │    │
+│   │                                                     │    │
+│   │ Indexes:                                            │    │
+│   │  - fid: UNIQUE                                      │    │ 
+│   │  - posisjon: GIST                                   │    │
+│   └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: fylker                                       │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - id: INTEGER, PK                                  │    │
+│   │  - navn: VARCHAR                                    │    │
+│   │  - geomfylke: GEOMETRY(Polygon, 4326)               │    │
+│   │                                                     │    │
+│   │ Indexes:                                            │    │
+│   │  - id: UNIQUE                                       │    │
+│   │  - geomfylke: GIST                                  │    │
+│   └─────────────────────────────────────────────────────┘    │ 
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: nvdb_roads                                   │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - ogc_fid: INTEGER, PK                             │    │
+│   │  - net.typeveg: CHARACTER VARYING                   │    │
+│   │  - geom_4326: GEOMETRY(LineString, 4326)            │    │
+│   │                                                     │    │
+│   │ Indexes:                                            │    │
+│   │  - ogc_fid: UNIQUE                                  │    │
+│   │  - geom_4326: GIST                                  │    │
+│   │  - net.typeveg: B-tree                              │    │
+│   │                                                     │    │
+│   │ Storage:                                            │    │
+│   │  - geom_4326: TOAST Compressed                      │    │
+│   └─────────────────────────────────────────────────────┘    │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘
+```
 
 # 2. Deliverable 1 - Webutvikling, GIS, Kartografi
 
