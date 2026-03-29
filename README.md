@@ -249,8 +249,7 @@ The `get_nvdb_roads_geojson` is a stored function that retrieves road network da
 
 1. **Envelope Construction**
    - Frontend A* function sends bbox coordinates: `min_lng, min_lat, max_lng, max_lat`
-   - Stored function creates rectangular envelope using `ST_MakeEnvelope()`
-   - Geometry boundary defined in the EPSG:4326 coordinate system
+   - Stored function creates a polygonal envelope using `ST_MakeEnvelope()`
 
 2. **Example**
    ```sql
@@ -270,7 +269,7 @@ The `get_nvdb_roads_geojson` is a stored function that retrieves road network da
        ST_MakeEnvelope(p_min_lng, p_min_lat, p_max_lng, p_max_lat, 4326)
    )
    ```
-   - Checks which road segments overlap with requested bbox
+   - Checks which road segments overlap with the requested bbox
    - Uses spatial index for O(log n) performance instead of O(n) table scan
    - Returns road graph with segments that intersect the bounding box
 
