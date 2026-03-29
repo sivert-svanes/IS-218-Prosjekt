@@ -8,6 +8,7 @@ import {
 import { registerKonamiCode } from './middleEarth.js';
 import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer} from './layer.js'
 import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
+import { getMapStyle } from './mapStyles.js';
 
 declare global {
   interface Window {
@@ -27,7 +28,7 @@ if (!maplibregl) {
   // Create a local `map` variable so TypeScript knows it's defined when we call methods on it.
   const map = new maplibregl.Map({
     container: 'map' as string,
-    style: '../static/style/mapstyle.json' as string,
+    style: getMapStyle('default'),
     center: [8.0, 59.0] as LngLatLike,
     zoom: 2 as number,
   });
