@@ -27,27 +27,27 @@ low supply and provide routes to get supplies, accounting for threats.
 ### Backend
 | Component   | Version | Usage                                            |
 |-------------|---------|--------------------------------------------------|
-| Python      | 3.10+   | Core programming language for backend            |
-| Flask       | ^3.1.3  | Web framework                                    |
-| SQLAlchemy  | ^2.0.46 | ORM for database abstraction and queries         |
-| GeoAlchemy2 | ^0.18.1 | PostGIS extension for spatial data in SQLAlchemy |
+| Python      | 3.10    | Core programming language for backend            |
+| Flask       | 3.1.3   | Web framework                                    |
+| SQLAlchemy  | 2.0.46  | ORM for database abstraction and queries         |
+| GeoAlchemy2 | 0.18.1  | PostGIS extension for spatial data in SQLAlchemy |
 | diskcache   | n.a.    | Optional disk-based caching for performance      |
-| spglib      | ^2.7.0  | Space group library for crystallographic data    |
-| psycopg2    | ^2.9.11 | PostgreSQL adapter for Python                    |
-| psycopg     | ^3.3.3  | Modern PostgreSQL adapter (psycopg3)             |
+| spglib      | 2.7.0   | Space group library for crystallographic data    |
+| psycopg2    | 2.9.11  | PostgreSQL adapter for Python                    |
+| psycopg     | 3.3.3   | Modern PostgreSQL adapter (psycopg3)             |
 | hashlib     | n.a.    | Built-in cryptographic hashing                   |
 
 ### Database
-| Component  | Version | Usage |
-|------------|---------|-------|
-| PostgreSQL | 15+     | Relational database server for data persistence |
-| PostGIS    | 3.3+    | Spatial extension for storing and querying geospatial data |
+| Component  | Version     | Usage                                                      |
+|------------|-------------|------------------------------------------------------------|
+| PostgreSQL | 17.6 (GCC)  | Relational database server for data persistence            |
+| PostGIS    | 3.3.7 (GCC) | Spatial extension for storing and querying geospatial data |
 
 ## 4. Data Catalog
 
 | Dataset            | Source                                                                                                                  | Format   | Processing                                                         |
 |--------------------|-------------------------------------------------------------------------------------------------------------------------|----------|--------------------------------------------------------------------|
-| Emergency Shelters | [GeoNorge](https://kartkatalog.geonorge.no/metadata/tilfluktsrom-offentlige/dbae9aae-10e7-4b75-8d67-7f0e8828f3d8)                | GML      | Converted to PostGIS geometry, indexed for spatial queries         |
+| Emergency Shelters | [GeoNorge](https://kartkatalog.geonorge.no/metadata/tilfluktsrom-offentlige/dbae9aae-10e7-4b75-8d67-7f0e8828f3d8)       | GML      | Converted to PostGIS geometry, indexed for spatial queries         |
 | NVDB               | [Statens Vegvesen](https://www.nvdb.no/hent-og-se-data/eksport/nvdb-eksport/brukerveiledning/)                          | WKT(CSV) | Converted to PostGIS geometry, spatial indexing, TOAST compression |
 | County Boundaries  | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) | GeoJSON  | Converted to PostGIS polygons for administrative filtering         |
 | Map Style          | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           | JSON     | Applied globe projection and custom styling                        |
