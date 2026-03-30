@@ -11,9 +11,14 @@ declare global {
 const maplibregl = window.maplibregl;
 const layersToggle = document.getElementById('layers-toggle');
 const layersMenu   = document.getElementById('layers-menu');
+const stylesToggle = document.getElementById('styles-toggle');
+const stylesMenu   = document.getElementById('styles-menu');
 
 // Map to store checkbox references by layer ID for programmatic updates
 const layerCheckboxes = new Map<string, HTMLInputElement>();
+
+// Set to track which layers are style layers (created by registerStyle)
+const styleLayers = new Set<string>();
 
 function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLat?: { lng: number; lat: number }): void {
   const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
@@ -95,6 +100,22 @@ document.addEventListener('click', () => {
 // Prevent clicks inside the menu from closing it
 layersMenu?.addEventListener('click', (e) => e.stopPropagation());
 
+// Open / close the styles dropdown when clicking the toggle button
+stylesToggle?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  stylesMenu?.classList.toggle('open');
+  overlay?.classList.toggle('dropdown-open');
+  // Align dropdown to span the full overlay width
+  if (stylesMenu?.classList.contains('open') && overlay) {
+    const overlayRect = overlay.getBoundingClientRect();
+    stylesMenu.style.top = overlayRect.bottom + 'px';
+    stylesMenu.style.left = overlayRect.left + 'px';
+    stylesMenu.style.width = overlayRect.width + 'px';
+  }
+});
+// Prevent clicks inside the styles menu from closing it
+stylesMenu?.addEventListener('click', (e) => e.stopPropagation());
+
 /**
  * Register a map layer in the Layers dropdown so the user can toggle it.
  *
@@ -130,6 +151,62 @@ function registerLayer(layerId: string, label: string, visible: boolean, map: Ma
 
   // Store checkbox reference for programmatic updates
   layerCheckboxes.set(layerId, cb);
+}
+
+/**
+ * Register a style layer in the Layers dropdown so the user can toggle it.
+ * Only layers created by registerStyle() should use this function.
+ *
+ * @param styleId The style id (as used in registerStyle)
+ * @param label Human-readable label shown in the menu
+ * @param visible Whether the layer starts visible (default false)
+ * @param map The map instance
+ */
+export function registerStyleLayer(styleId: string, label: string, visible: boolean, map: MaplibreGL.Map): void {
+  const layerId = `${styleId}-layer`;
+
+  // Track this as a style layer
+  styleLayers.add(layerId);
+
+  // Register in the UI using the existing registerLayer function
+  registerLayer(layerId, label, visible, map);
+}
+
+/**
+ * Register a style layer in the Styles dropdown menu so the user can toggle it.
+ * @param styleId The style id (as used in registerStyle)
+ * @param label Human-readable label shown in the menu
+ * @param visible Whether the layer starts visible (default false)
+ * @param map The map instance
+ */
+export function registerStyleInMenu(styleId: string, label: string, visible: boolean, map: MaplibreGL.Map): void {
+  if (!stylesMenu) return;
+
+  // Remove the "no styles" placeholder if present
+  const empty = stylesMenu.querySelector('.dropdown-empty');
+  if (empty) empty.remove();
+
+  const layerId = `${styleId}-layer`;
+
+  const item = document.createElement('label');
+  item.className = 'dropdown-item prevent-select';
+
+  const cb = document.createElement('input');
+  cb.type = 'checkbox';
+  cb.checked = visible;
+
+  cb.addEventListener('change', () => {
+    if (map.getLayer(layerId)) {
+      map.setLayoutProperty(layerId, 'visibility', cb.checked ? 'visible' : 'none');
+    }
+  });
+
+  const span = document.createElement('span');
+  span.textContent = label;
+
+  item.appendChild(cb);
+  item.appendChild(span);
+  stylesMenu.appendChild(item);
 }
 
 /**
@@ -414,3 +491,21 @@ export function ClearShortestPathLayer(map: MaplibreGL.Map): void {
   const btn = document.getElementById('clear-path-btn');
   if (btn) btn.style.display = 'none';
 }
+
+/**
+ * Checks if a layer is a style layer (created by registerStyle)
+ * @param layerId The layer ID to check
+ * @returns true if the layer is a style layer
+ */
+export function isStyleLayer(layerId: string): boolean {
+  return styleLayers.has(layerId);
+}
+
+/**
+ * Gets all registered style layers
+ * @returns Array of style layer IDs
+ */
+export function getStyleLayers(): string[] {
+  return Array.from(styleLayers);
+}
+

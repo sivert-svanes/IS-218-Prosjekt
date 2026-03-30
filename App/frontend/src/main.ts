@@ -6,10 +6,10 @@ import {
   PropertyValueSpecification
 } from "maplibre-gl";
 import { registerKonamiCode } from './middleEarth.js';
-import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer} from './layer.js'
+import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer, registerStyleLayer, registerStyleInMenu, isStyleLayer, getStyleLayers} from './layer.js'
 import {registerStyle} from "./mapStyles.js";
 import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
-import { getMapStyle, GLOBE_FADE_CONFIG, DARK_PAINTS } from './mapStyles.js';
+import { getMapStyle, GLOBE_FADE_CONFIG, DARK_PAINTS, toggleStyleLayer, isStyleLayerVisible } from './mapStyles.js';
 
 declare global {
   interface Window {
@@ -108,6 +108,9 @@ if (!maplibregl) {
       fadeZoomStart: 6,
       fadeZoomEnd: 10,
     });
+
+    // Add OSM raster layer to the styles menu
+    registerStyleInMenu('osm-raster', 'OpenStreetMap Raster', false, map);
 
     // Stars layer
     import("./starsLayer.js").then(({ createStarsLayer }) => {
