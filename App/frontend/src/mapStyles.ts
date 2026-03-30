@@ -161,6 +161,9 @@ export function registerStyle(map: MaplibreGL.Map, options: RegisterStyleOptions
           ],
         },
       }),
+      layout: {
+        visibility: 'none',
+      },
     } as any;
 
     map.addLayer(layerConfig);
