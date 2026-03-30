@@ -7,8 +7,9 @@ import {
 } from "maplibre-gl";
 import { registerKonamiCode } from './middleEarth.js';
 import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer} from './layer.js'
+import {registerStyle} from "./mapStyles.js";
 import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
-import { getMapStyle } from './mapStyles.js';
+import { getMapStyle, GLOBE_FADE_CONFIG, DARK_PAINTS } from './mapStyles.js';
 
 declare global {
   interface Window {
@@ -40,15 +41,13 @@ if (!maplibregl) {
     positionOptions: { enableHighAccuracy: true as boolean },
     trackUserLocation: true as boolean,
     showAccuracyCircle: true as boolean,
-
   });
   map.addControl(geolocate, 'top-right');
 
   map.on('load', () => {
     try {
       geolocate?.trigger();
-    }
-    catch (err) {
+    } catch (err) {
       console.warn('Geolocate trigger failed:', err);
     }
   });
@@ -66,7 +65,7 @@ if (!maplibregl) {
       let lat: number | undefined;
       let lng: number | undefined;
 
-      //Override geolocation, oslo: window.debugGeoLocation = {lat: 59.9139, lng: 10.7522};
+      // Override geolocation for testing (e.g., oslo: window.debugGeoLocation = {lat: 59.9139, lng: 10.7522})
       if (window.debugGeoLocation) {
         lat = window.debugGeoLocation.lat;
         lng = window.debugGeoLocation.lng;
@@ -99,33 +98,16 @@ if (!maplibregl) {
       type: 'globe' as string,
     });
 
-    // Add OSM raster layer on top (will fade in when zoomed in)
-    if (!map.getSource('osm-raster')) {
-      map.addSource('osm-raster', {
-        type: 'raster',
-        tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-        tileSize: 256,
-        attribution: '© OpenStreetMap contributors',
-      });
-    }
-
-    //Todo: hardcoded fix this
-    if (!map.getLayer('osm-raster-layer')) {
-      map.addLayer({
-        id: 'osm-raster-layer',
-        type: 'raster',
-        source: 'osm-raster',
-        paint: {
-          'raster-opacity': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            6, 0,
-            10, 1
-          ]
-        }
-      });
-    }
+    // Register OSM raster layer that fades in when zoomed in
+    registerStyle(map, {
+      id: 'osm-raster',
+      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+      type: 'raster',
+      tileSize: 256,
+      attribution: '© OpenStreetMap contributors',
+      fadeZoomStart: 6,
+      fadeZoomEnd: 10,
+    });
 
     // Stars layer
     import("./starsLayer.js").then(({ createStarsLayer }) => {
@@ -136,8 +118,8 @@ if (!maplibregl) {
           density: 0.55 as number,
         });
         if (!map.getLayer('stars')) {
-          const layers : LayerSpecification[] = map.getStyle().layers;
-          const firstLayerId : string | undefined = layers && layers.length > 0 ? layers[0].id : undefined;
+          const layers: LayerSpecification[] = map.getStyle().layers;
+          const firstLayerId: string | undefined = layers && layers.length > 0 ? layers[0].id : undefined;
           map.addLayer(starsLayer as AddLayerObject, firstLayerId);
         }
       } catch (err) {
@@ -147,22 +129,14 @@ if (!maplibregl) {
       console.warn('Failed to load starsLayer module:', err);
     });
 
-    const LIGHT_THETA_DEG : number = -37;
-    const LIGHT_PHI_DEG : number = 4;
-    const LIGHT_RADIAL_DIST : number = 300000.0;
-    const LIGHT_COLOR : string = '#ffffff';
-
-    // Maximum light intensity when fully zoomed out (globe view)
-    // Maximum atmosphere-blend when fully zoomed out (1.0 = full atmosphere glow)
-    const LIGHT_INTENSITY_MAX : number = 1.0 as number;
-    const ATMOSPHERE_BLEND_MAX : number = 1.0 as number;
-
-    // Zoom range over which globe effects (light, atmosphere, dark colors)
-    // are fully active vs. fully faded out to the normal map style.
-    // At or below FADE_ZOOM_START everything is in "globe/dark" mode.
-    // At or above FADE_ZOOM_END everything matches the original bright style.
-    const FADE_ZOOM_START : number = 6;
-    const FADE_ZOOM_END : number = 10;
+    const LIGHT_THETA_DEG: number = GLOBE_FADE_CONFIG.LIGHT_THETA_DEG;
+    const LIGHT_PHI_DEG: number = GLOBE_FADE_CONFIG.LIGHT_PHI_DEG;
+    const LIGHT_RADIAL_DIST: number = GLOBE_FADE_CONFIG.LIGHT_RADIAL_DIST;
+    const LIGHT_COLOR: string = GLOBE_FADE_CONFIG.LIGHT_COLOR;
+    const LIGHT_INTENSITY_MAX: number = GLOBE_FADE_CONFIG.LIGHT_INTENSITY_MAX;
+    const ATMOSPHERE_BLEND_MAX: number = GLOBE_FADE_CONFIG.ATMOSPHERE_BLEND_MAX;
+    const FADE_ZOOM_START: number = GLOBE_FADE_CONFIG.FADE_ZOOM_START;
+    const FADE_ZOOM_END: number = GLOBE_FADE_CONFIG.FADE_ZOOM_END;
 
     // Calculate light position (radial distance, azimuthal angle, polar angle)
     const p = (Math.acos(Math.cos((LIGHT_THETA_DEG / 180 as number + 1 as number) * Math.PI)
@@ -172,7 +146,7 @@ if (!maplibregl) {
       Math.sin((LIGHT_THETA_DEG / 180 as number + 1 as number) * Math.PI) * Math.cos((LIGHT_PHI_DEG / 180 as number) * Math.PI)
     ) / Math.PI) * 180 as number;
 
-    //interpolate a value between two zoom stops
+    // Interpolate a value between two zoom stops
     function lerpAtZoom(zoom: number, z1: number, v1: number, z2: number, v2: number): number {
       if (zoom <= z1) return v1;
       if (zoom >= z2) return v2;
@@ -180,8 +154,8 @@ if (!maplibregl) {
     }
 
     function updateLightForZoom() {
-      const z : number = map.getZoom();
-      const intensity : number = lerpAtZoom(z, FADE_ZOOM_START, LIGHT_INTENSITY_MAX, FADE_ZOOM_END, 0);
+      const z: number = map.getZoom();
+      const intensity: number = lerpAtZoom(z, FADE_ZOOM_START, LIGHT_INTENSITY_MAX, FADE_ZOOM_END, 0);
       map.setLight({
         anchor: 'map' as PropertyValueSpecification<"map">,
         position: [LIGHT_RADIAL_DIST, a, p],
@@ -190,7 +164,7 @@ if (!maplibregl) {
       });
     }
 
-    updateLightForZoom(); //set initial light
+    updateLightForZoom(); // Set initial light
     map.on('zoom', updateLightForZoom);
 
     map.setSky({
@@ -204,64 +178,8 @@ if (!maplibregl) {
       ],
     });
 
-    const darkPaints: [string, string, string, string][] = [
-      ['background',          'background-color', 'rgb(11, 11, 15)',    'rgb(242, 243, 240)'],
-      ['water',               'fill-color',       'rgb(5, 8, 18)',      'rgb(194, 200, 202)'],
-      ['park',                'fill-color',       'rgb(8, 12, 8)',      'rgb(230, 233, 229)'],
-      ['landcover_ice_shelf', 'fill-color',       'rgb(12, 12, 14)',    'hsl(0, 0%, 98%)'],
-      ['landcover_glacier',   'fill-color',       'rgb(12, 12, 14)',    'hsl(0, 0%, 98%)'],
-      ['landuse_residential', 'fill-color',       'rgb(10, 10, 12)',    'rgb(234, 234, 230)'],
-      ['landcover_wood',      'fill-color',       'rgb(6, 10, 6)',      'rgb(230, 233, 229)'],
-      ['building',            'fill-color',       'rgb(14, 14, 16)',    'rgb(234, 234, 229)'],
-      ['building',            'fill-outline-color','rgb(10, 10, 12)',   'rgb(219, 219, 218)'],
-      ['waterway',            'line-color',       'rgb(5, 8, 18)',      'rgb(194, 200, 202)'],
-      ['boundary_2',          'line-color',       'rgb(5, 5, 8)',       'hsl(0, 0%, 70%)'],
-      ['boundary_3',          'line-color',       'rgb(5, 5, 8)',       'hsl(0, 0%, 70%)'],
-      ['boundary_disputed',   'line-color',       'rgb(5, 5, 8)',       'hsl(0, 0%, 70%)'],
-      ['tunnel_motorway_casing',        'line-color', 'rgb(10, 10, 14)',    'rgb(213, 213, 213)'],
-      ['tunnel_motorway_inner',         'line-color', 'rgb(12, 12, 16)',    'rgb(234, 234, 234)'],
-      ['highway_path',                  'line-color', 'rgb(12, 12, 16)',    'rgb(234, 234, 234)'],
-      ['highway_minor',                 'line-color', 'rgb(10, 10, 14)',    'hsl(0, 0%, 88%)'],
-      ['highway_major_casing',          'line-color', 'rgb(10, 10, 14)',    'rgb(213, 213, 213)'],
-      ['highway_major_inner',           'line-color', 'rgb(12, 12, 16)',    '#ffffff'],
-      ['highway_major_subtle',          'line-color', 'rgba(10,10,14,0.69)', 'hsla(0,0%,85%,0.69)'],
-      ['highway_motorway_casing',       'line-color', 'rgb(10, 10, 14)',    'rgb(213, 213, 213)'],
-      ['highway_motorway_inner',        'line-color', 'rgb(12, 12, 16)',    '#ffffff'],
-      ['highway_motorway_subtle',       'line-color', 'rgba(10,10,14,0.53)', 'hsla(0,0%,85%,0.53)'],
-      ['highway_motorway_bridge_casing','line-color', 'rgb(10, 10, 14)',    'rgb(213, 213, 213)'],
-      ['highway_motorway_bridge_inner', 'line-color', 'rgb(12, 12, 16)',    '#ffffff'],
-      ['road_area_pier',                'fill-color', 'rgb(8, 8, 12)',      'rgb(242, 243, 240)'],
-      ['road_pier',                     'line-color', 'rgb(8, 8, 12)',      'rgb(242, 243, 240)'],
-      ['railway',                       'line-color', 'rgb(10, 10, 14)',    '#dddddd'],
-      ['railway_dashline',              'line-color', 'rgb(12, 12, 16)',    '#fafafa'],
-      ['railway_transit',               'line-color', 'rgb(10, 10, 14)',    '#dddddd'],
-      ['railway_transit_dashline',      'line-color', 'rgb(12, 12, 16)',    '#fafafa'],
-      ['railway_service',               'line-color', 'rgb(10, 10, 14)',    '#dddddd'],
-      ['railway_service_dashline',      'line-color', 'rgb(12, 12, 16)',    '#fafafa'],
-      ['label_country_1',     'text-color',       'rgb(35, 35, 45)',    '#000000'],
-      ['label_country_1',     'text-halo-color',  'rgb(2, 2, 4)',       '#ffffff'],
-      ['label_country_2',     'text-color',       'rgb(35, 35, 45)',    '#000000'],
-      ['label_country_2',     'text-halo-color',  'rgb(2, 2, 4)',       '#ffffff'],
-      ['label_country_3',     'text-color',       'rgb(35, 35, 45)',    '#000000'],
-      ['label_country_3',     'text-halo-color',  'rgb(2, 2, 4)',       '#ffffff'],
-      ['label_city',          'text-color',       'rgb(35, 35, 45)',    '#000000'],
-      ['label_city',          'text-halo-color',  'rgb(2, 2, 4)',       '#ffffff'],
-      ['label_city_capital',  'text-color',       'rgb(35, 35, 45)',    '#000000'],
-      ['label_city_capital',  'text-halo-color',  'rgb(2, 2, 4)',       '#ffffff'],
-      ['label_town',          'text-color',       'rgb(35, 35, 45)',    '#000000'],
-      ['label_town',          'text-halo-color',  'rgb(2, 2, 4)',       '#ffffff'],
-      ['label_state',         'text-color',       'rgb(35, 35, 45)',    '#333333'],
-      ['label_state',         'text-halo-color',  'rgb(2, 2, 4)',       '#ffffff'],
-      ['waterway_line_label',   'text-halo-color', 'rgba(2, 2, 4, 0.7)',      'rgba(255, 255, 255, 0.7)'],
-      ['waterway_line_label',   'text-color',      'rgb(20, 25, 40)',         'hsl(0, 0%, 66%)'],
-      ['water_name_point_label','text-halo-color', 'rgba(2, 2, 4, 0.7)',      'rgba(255, 255, 255, 0.7)'],
-      ['water_name_point_label','text-color',      'rgb(15, 20, 45)',         '#495e91'],
-      ['water_name_line_label', 'text-halo-color', 'rgba(2, 2, 4, 0.7)',      'rgba(255, 255, 255, 0.7)'],
-      ['water_name_line_label', 'text-color',      'rgb(15, 20, 45)',         '#495e91'],
-    ];
-
-    // Apply the dark-to-light color transitions for each layer
-    darkPaints.forEach(([layerId, property, darkColor, lightColor]) => {
+    // Apply dark-to-light color transitions for each layer
+    DARK_PAINTS.forEach(([layerId, property, darkColor, lightColor]) => {
       const layer = map.getLayer(layerId);
       if (layer) {
         map.setPaintProperty(layerId, property, [
@@ -274,6 +192,8 @@ if (!maplibregl) {
         ]);
       }
     });
+
+    // Load all layers
     const fylkeIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     (async () => {
       await AddShelterLayerGeospatial(map, fylkeIds);
@@ -281,5 +201,5 @@ if (!maplibregl) {
       AddVannOgVassdragLayers(map);
       AddFKBVeiLayer(map);
     })().catch(err => console.error('Error loading layers:', err));
-  }
-)}
+  });
+}
