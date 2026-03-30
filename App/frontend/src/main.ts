@@ -6,10 +6,11 @@ import {
   PropertyValueSpecification
 } from "maplibre-gl";
 import { registerKonamiCode } from './middleEarth.js';
-import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer, registerStyleLayer, registerStyleInMenu, isStyleLayer, getStyleLayers} from './layer.js'
+import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer} from './layer.js'
+import {registerStyleInMenu, initializeDropdownMenus} from './layerControl.js'
 import {registerStyle} from "./mapStyles.js";
 import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
-import { getMapStyle, GLOBE_FADE_CONFIG, DARK_PAINTS, toggleStyleLayer, isStyleLayerVisible } from './mapStyles.js';
+import { getMapStyle, GLOBE_FADE_CONFIG, DARK_PAINTS } from './mapStyles.js';
 
 declare global {
   interface Window {
@@ -36,6 +37,7 @@ if (!maplibregl) {
 
   window.map = map;
   registerKonamiCode(map);
+  initializeDropdownMenus();
 
   const geolocate = new maplibregl.GeolocateControl({
     positionOptions: { enableHighAccuracy: true as boolean },

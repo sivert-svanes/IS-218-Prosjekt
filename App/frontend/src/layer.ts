@@ -1,4 +1,9 @@
 import type * as MaplibreGL from "maplibre-gl";
+import {
+  layerCheckboxes,
+  registerLayer,
+} from './layerControl.js';
+
 declare global {
   interface Window {
     // The global injected by the CDN; optional because it may not be present in some environments
@@ -9,18 +14,11 @@ declare global {
 }
 
 const maplibregl = window.maplibregl;
-const layersToggle = document.getElementById('layers-toggle');
-const layersMenu   = document.getElementById('layers-menu');
-const stylesToggle = document.getElementById('styles-toggle');
-const stylesMenu   = document.getElementById('styles-menu');
 
 const WMS_PROXY = '/api/wms-proxy';
 const DSB_WMS_BASE_URL = 'https://ogc.dsb.no/wms.ashx';
 const GEONORGE_GRUNNKART_BASE_URL = 'https://wms.geonorge.no/skwms1/wms.norges_grunnkart';
 
-// Tracks visible layers and active dropdowns
-const layerCheckboxes = new Map<string, HTMLInputElement>();
-const styleLayers = new Set<string>();
 
 function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLat?: { lng: number; lat: number }): void {
   const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
@@ -46,7 +44,7 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
     new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
   }
 }
-
+// Layer configuration constants
 // Geonorge Vann og vassdrag layers
 // Layer names sourced from GetCapabilities: wms.norges_grunnkart
 const GEONORGE_VANN_LAYERS: { name: string; title: string }[] = [
@@ -70,153 +68,6 @@ const DSB_WMS_LAYERS: { name: string; title: string }[] = [
   { name: 'layer_444', title: 'Nødnett dekning håndholdt' },
   { name: 'layer_443', title: 'Nødnett dekning kjøretøymontert' },
 ];
-
-// Helper function to close both dropdowns
-function closeAllDropdowns() {
-  layersMenu?.classList.remove('open');
-  stylesMenu?.classList.remove('open');
-  overlay?.classList.remove('dropdown-open');
-}
-
-// Helper function to open a specific dropdown
-function openDropdown(menu: HTMLElement | null, toggle: HTMLElement | null) {
-  if (!menu || !overlay) return;
-
-  // Close the other menu
-  if (menu === layersMenu) {
-    stylesMenu?.classList.remove('open');
-  } else {
-    layersMenu?.classList.remove('open');
-  }
-
-  // Open the selected menu
-  menu.classList.add('open');
-  overlay.classList.add('dropdown-open');
-
-  // Align dropdown to span the full overlay width
-  const overlayRect = overlay.getBoundingClientRect();
-  menu.style.top = overlayRect.bottom + 'px';
-  menu.style.left = overlayRect.left + 'px';
-  menu.style.width = overlayRect.width + 'px';
-}
-
-// Open / close the dropdown when clicking the toggle button
-const overlay = document.querySelector('.map-overlay') as HTMLElement | null;
-layersToggle?.addEventListener('click', (e) => {
-  e.stopPropagation();
-  const isOpen = layersMenu?.classList.contains('open');
-  closeAllDropdowns();
-  if (!isOpen) {
-    openDropdown(layersMenu, layersToggle);
-  }
-});
-
-document.addEventListener('click', () => {
-  closeAllDropdowns();
-});
-
-// Prevent clicks inside the menu from closing it
-layersMenu?.addEventListener('click', (e) => e.stopPropagation());
-
-// Open / close the styles dropdown when clicking the toggle button
-stylesToggle?.addEventListener('click', (e) => {
-  e.stopPropagation();
-  const isOpen = stylesMenu?.classList.contains('open');
-  closeAllDropdowns();
-  if (!isOpen) {
-    openDropdown(stylesMenu, stylesToggle);
-  }
-});
-
-// Prevent clicks inside the styles menu from closing it
-stylesMenu?.addEventListener('click', (e) => e.stopPropagation());
-
-/**
- * Register a map layer in the Layers dropdown so the user can toggle it.
- * @param layerId The MapLibre layer id to toggle visibility for.
- * @param label Human-readable label shown in the menu.
- * @param visible Whether the layer starts visible (default true).
- * @param map The map to add the layer to
- */
-function registerLayer(layerId: string, label: string, visible: boolean, map: MaplibreGL.Map) {
-  if (!layersMenu) return;
-
-  // Remove the "no layers" placeholder if present
-  const empty = layersMenu.querySelector('.dropdown-empty');
-  if (empty) empty.remove();
-
-  const item = document.createElement('label');
-  item.className = 'dropdown-item prevent-select';
-
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.checked = visible;
-
-  cb.addEventListener('change', () => {
-    map.setLayoutProperty(layerId, 'visibility', cb.checked ? 'visible' : 'none');
-  });
-
-  const span = document.createElement('span');
-  span.textContent = label;
-
-  item.appendChild(cb);
-  item.appendChild(span);
-  layersMenu.appendChild(item);
-
-  layerCheckboxes.set(layerId, cb);
-}
-
-/**
- * Register a style layer in the Layers dropdown so the user can toggle it.
- * Only layers created by registerStyle() should use this function.
- * @param styleId The style id (as used in registerStyle)
- * @param label Human-readable label shown in the menu
- * @param visible Whether the layer starts visible (default false)
- * @param map The map instance
- */
-export function registerStyleLayer(styleId: string, label: string, visible: boolean, map: MaplibreGL.Map): void {
-  const layerId = `${styleId}-layer`;
-
-  styleLayers.add(layerId);
-  registerLayer(layerId, label, visible, map);
-}
-
-/**
- * Register a style layer in the Styles dropdown menu so the user can toggle it.
- * @param styleId The style id (as used in registerStyle)
- * @param label Human-readable label shown in the menu
- * @param visible Whether the layer starts visible (default false)
- * @param map The map instance
- */
-export function registerStyleInMenu(styleId: string, label: string, visible: boolean, map: MaplibreGL.Map): void {
-  if (!stylesMenu) return;
-
-  // Remove the "no styles" placeholder if present
-  const empty = stylesMenu.querySelector('.dropdown-empty');
-  if (empty) empty.remove();
-
-  const layerId = `${styleId}-layer`;
-
-  const item = document.createElement('label');
-  item.className = 'dropdown-item prevent-select';
-
-  const cb = document.createElement('input');
-  cb.type = 'checkbox';
-  cb.checked = visible;
-
-  cb.addEventListener('change', () => {
-    if (map.getLayer(layerId)) {
-      map.setLayoutProperty(layerId, 'visibility', cb.checked ? 'visible' : 'none');
-    }
-  });
-
-  const span = document.createElement('span');
-  span.textContent = label;
-
-  item.appendChild(cb);
-  item.appendChild(span);
-  stylesMenu.appendChild(item);
-}
 
 interface WmsRasterLayerConfig {
   sourceId: string;
@@ -497,21 +348,4 @@ export function ClearShortestPathLayer(map: MaplibreGL.Map): void {
 
   const btn = document.getElementById('clear-path-btn');
   if (btn) btn.style.display = 'none';
-}
-
-/**
- * Checks if a layer is a style layer (created by registerStyle)
- * @param layerId The layer ID to check
- * @returns true if the layer is a style layer
- */
-export function isStyleLayer(layerId: string): boolean {
-  return styleLayers.has(layerId);
-}
-
-/**
- * Gets all registered style layers
- * @returns Array of style layer IDs
- */
-export function getStyleLayers(): string[] {
-  return Array.from(styleLayers);
 }

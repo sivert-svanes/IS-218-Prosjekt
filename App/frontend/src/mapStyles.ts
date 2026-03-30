@@ -102,9 +102,6 @@ export const getMapStyle = (styleKey: MapStyleKey = 'default') => {
   return mapStyles[styleKey].style;
 };
 
-export const getMapStyleName = (styleKey: MapStyleKey = 'default') => {
-  return mapStyles[styleKey].name;
-};
 
 /**
  * Registers a tiled layer with the map, including its source.
@@ -168,35 +165,4 @@ export function registerStyle(map: MaplibreGL.Map, options: RegisterStyleOptions
 
     map.addLayer(layerConfig);
   }
-}
-
-/**
- * Toggles a style layer's visibility
- * @param map The MapLibre map instance
- * @param id The style id (as used in registerStyle)
- * @returns The new visibility state (true = visible, false = hidden)
- */
-export function toggleStyleLayer(map: MaplibreGL.Map, id: string): boolean {
-  const layerId = `${id}-layer`;
-  if (map.getLayer(layerId)) {
-    const currentVisibility = map.getLayoutProperty(layerId, 'visibility') as string;
-    const isVisible = currentVisibility !== 'none';
-    map.setLayoutProperty(layerId, 'visibility', isVisible ? 'none' : 'visible');
-    return !isVisible;
-  }
-  return false;
-}
-
-/**
- * Gets the current visibility state of a style layer
- * @param map The MapLibre map instance
- * @param id The style id (as used in registerStyle)
- * @returns true if visible, false if hidden or layer doesn't exist
- */
-export function isStyleLayerVisible(map: MaplibreGL.Map, id: string): boolean {
-  const layerId = `${id}-layer`;
-  const layer = map.getLayer(layerId);
-  if (!layer) return false;
-  const visibility = map.getLayoutProperty(layerId, 'visibility') as string;
-  return visibility !== 'none';
 }
