@@ -79,40 +79,63 @@ const DSB_WMS_LAYERS: { name: string; title: string }[] = [
   { name: 'layer_443', title: 'Nødnett dekning kjøretøymontert' },
 ];
 
+// Helper function to close both dropdowns
+function closeAllDropdowns() {
+  layersMenu?.classList.remove('open');
+  stylesMenu?.classList.remove('open');
+  overlay?.classList.remove('dropdown-open');
+}
+
+// Helper function to open a specific dropdown
+function openDropdown(menu: HTMLElement | null, toggle: HTMLElement | null) {
+  if (!menu || !overlay) return;
+
+  // Close the other menu
+  if (menu === layersMenu) {
+    stylesMenu?.classList.remove('open');
+  } else {
+    layersMenu?.classList.remove('open');
+  }
+
+  // Open the selected menu
+  menu.classList.add('open');
+  overlay.classList.add('dropdown-open');
+
+  // Align dropdown to span the full overlay width
+  const overlayRect = overlay.getBoundingClientRect();
+  menu.style.top = overlayRect.bottom + 'px';
+  menu.style.left = overlayRect.left + 'px';
+  menu.style.width = overlayRect.width + 'px';
+}
+
 // Open / close the dropdown when clicking the toggle button
 const overlay = document.querySelector('.map-overlay') as HTMLElement | null;
 layersToggle?.addEventListener('click', (e) => {
   e.stopPropagation();
-  layersMenu?.classList.toggle('open');
-  overlay?.classList.toggle('dropdown-open');
-  // Align dropdown to span the full overlay width
-  if (layersMenu?.classList.contains('open') && overlay) {
-    const overlayRect = overlay.getBoundingClientRect();
-    layersMenu.style.top = overlayRect.bottom + 'px';
-    layersMenu.style.left = overlayRect.left + 'px';
-    layersMenu.style.width = overlayRect.width + 'px';
+  const isOpen = layersMenu?.classList.contains('open');
+  closeAllDropdowns();
+  if (!isOpen) {
+    openDropdown(layersMenu, layersToggle);
   }
 });
+
 document.addEventListener('click', () => {
-  layersMenu?.classList.remove('open');
-  overlay?.classList.remove('dropdown-open');
+  closeAllDropdowns();
 });
+
 // Prevent clicks inside the menu from closing it
 layersMenu?.addEventListener('click', (e) => e.stopPropagation());
 
 // Open / close the styles dropdown when clicking the toggle button
 stylesToggle?.addEventListener('click', (e) => {
   e.stopPropagation();
-  stylesMenu?.classList.toggle('open');
-  overlay?.classList.toggle('dropdown-open');
-  // Align dropdown to span the full overlay width
-  if (stylesMenu?.classList.contains('open') && overlay) {
-    const overlayRect = overlay.getBoundingClientRect();
-    stylesMenu.style.top = overlayRect.bottom + 'px';
-    stylesMenu.style.left = overlayRect.left + 'px';
-    stylesMenu.style.width = overlayRect.width + 'px';
+  const isOpen = stylesMenu?.classList.contains('open');
+  closeAllDropdowns();
+  if (!isOpen) {
+    openDropdown(stylesMenu, stylesToggle);
   }
 });
+
 // Prevent clicks inside the styles menu from closing it
 stylesMenu?.addEventListener('click', (e) => e.stopPropagation());
 
@@ -508,4 +531,3 @@ export function isStyleLayer(layerId: string): boolean {
 export function getStyleLayers(): string[] {
   return Array.from(styleLayers);
 }
-
