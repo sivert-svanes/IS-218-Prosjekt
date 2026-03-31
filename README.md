@@ -416,6 +416,7 @@ The user interface is an interactive map where users can find the nearest shelte
 by clicking a button. The shortest path to a shelter is calculated and displayed.
 
 #### Finding Shelter
+<img width="517" height="63" alt="image" src="https://github.com/user-attachments/assets/812b2659-e7d7-4307-bd3f-45d0834f6763" />
 
 - User clicks the "Find Shelter" button on the map interface
 - A loading animation is displayed while the application runs the calculation
