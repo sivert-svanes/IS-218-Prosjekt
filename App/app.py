@@ -80,8 +80,8 @@ def _mem_set(key: str, value: tuple[bytes, str]):
         _mem_cache[key] = value
 
 
-@app.route('/')
-def hello_world():
+@app.route('/', methods=['GET'])
+def get_index():
     return flask.render_template('index.html')
 
 @app.route('/api/brannstasjoner')

@@ -1,11 +1,10 @@
+**Status**: Active Development | **Last Updated**: March 2026
 # ShelterLog
-
-## 1. Project Overview
 
 Our goal is to display public shelters and their current supplies on the map. The system will recognize locations with
 low supply and provide routes to get supplies, accounting for threats.
 
-## 2. Demo
+## 1. Demo
 
 > [!IMPORTANT]
 > <details>
@@ -15,7 +14,7 @@ low supply and provide routes to get supplies, accounting for threats.
 >
 > </details>
 
-## 3. Technical Stack
+## 2. Technical Stack
 
 ### Frontend
 | Component   | Version    | Usage                                              |
@@ -45,17 +44,17 @@ low supply and provide routes to get supplies, accounting for threats.
 
 ## 4. Data Catalog
 
-| Dataset            | Source                                                                                                                  | Format   | Processing                                                         |
-|--------------------|-------------------------------------------------------------------------------------------------------------------------|----------|--------------------------------------------------------------------|
-| Emergency Shelters | [GeoNorge](https://kartkatalog.geonorge.no/metadata/tilfluktsrom-offentlige/dbae9aae-10e7-4b75-8d67-7f0e8828f3d8)       | GML      | Converted to PostGIS geometry, indexed for spatial queries         |
-| NVDB               | [Statens Vegvesen](https://www.nvdb.no/hent-og-se-data/eksport/nvdb-eksport/brukerveiledning/)                          | WKT(CSV) | Converted to PostGIS geometry, spatial indexing, TOAST compression |
-| County Boundaries  | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) | GeoJSON  | Converted to PostGIS polygons for administrative filtering         |
-| Map Style          | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           | JSON     | Applied globe projection and custom styling                        |
-| FKB                | [Kartverket](https://wms.geonorge.no/skwms1/wms.fkb?service=wms&request=getcapabilities)                                | WMS      | Caching of tiles in memory and on disk                             |
-| Population Grid 250m | [GeoNorge](https://kartkatalog.geonorge.no/metadata/befolkning-paa-rutenett-250-m/0c0ad0ce-55e8-4d73-9c12-0eb0e2454acb) | FGDB → GeoPackage | Imported to PostGIS, used for population aggregation and coverage analysis |
+| Dataset              | Source                                                                                                                  | Format   | Processing                                                                 |
+|----------------------|-------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------|
+| Emergency Shelters   | [GeoNorge](https://kartkatalog.geonorge.no/metadata/tilfluktsrom-offentlige/dbae9aae-10e7-4b75-8d67-7f0e8828f3d8)       | GML      | Converted to PostGIS geometry, indexed for spatial queries                 |
+| NVDB                 | [Statens Vegvesen](https://www.nvdb.no/hent-og-se-data/eksport/nvdb-eksport/brukerveiledning/)                          | WKT(CSV) | Converted to PostGIS geometry, spatial indexing, TOAST compression         |
+| County Boundaries    | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) | GeoJSON  | Converted to PostGIS polygons for administrative filtering                 |
+| Map Style            | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           | JSON     | Applied globe projection and custom styling                                |
+| FKB                  | [Kartverket](https://wms.geonorge.no/skwms1/wms.fkb?service=wms&request=getcapabilities)                                | WMS      | Caching of tiles in memory and on disk                                     |
+| Population Grid 250m | [GeoNorge](https://kartkatalog.geonorge.no/metadata/befolkning-paa-rutenett-250-m/0c0ad0ce-55e8-4d73-9c12-0eb0e2454acb) | FGDB     | Imported to PostGIS, used for population aggregation and coverage analysis |
 ## 5. Architecture Overview
 
-## 1. Application Architecture
+### 1. Application Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
@@ -65,7 +64,7 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - Initializes MapLibre map with globe projection     │  │
 │   │  - Manages geolocation                                │  │
 │   │  - Loads dynamic layers                               │  │
-│   │                                                       │  │                                                    │  │
+│   │                                                       │  │
 │   │ layer.ts - Data Loading                               │  │
 │   │  - Functions for adding data layers to the map        │  │
 │   │  - Fetch and cache WMS raster tiles                   │  │
@@ -106,6 +105,9 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - /api/nearest-shelters - Find k-nearest shelters    │  │
 │   │  - /api/wms-proxy - mem/disk cache for WMS raster     │  │
 │   │  - /api/nvdb/roads - Query road network data          │  │
+│   │                                                       │  │
+│   │  HTTP Methods:                                        │  │
+│   │  - Get_Index: POST - Renders index                    │  │
 │   └───────────────────────────────────────────────────────┘  │
 └──────────────────────┬───────────────────────────────────────┘
                        │ PL/pgSQL Stored Functions
@@ -129,7 +131,7 @@ low supply and provide routes to get supplies, accounting for threats.
 4. Results returned as GeoJSON to frontend
 5. Frontend visualizes path and shelter locations on interactive map
 
-## 2. Database Schema
+## 3. Database Schema
 
 ### 1. Database Tables
 
@@ -187,10 +189,32 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │ Storage:                                            │    │
 │   │  - geom_4326: TOAST Compressed                      │    │
 │   └─────────────────────────────────────────────────────┘    │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: befolkning_rutenett_250m_2025                │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - ogc_fid: INTEGER, PK                             │    │
+│   │  - objtype: VARCHAR(32)                             │    │
+│   │  - lokalid: VARCHAR(100)                            │    │
+│   │  - navnerom: VARCHAR(100)                           │    │
+│   │  - versjonid: VARCHAR(100)                          │    │
+│   │  - oppdateringsdato: TIMESTAMP WITH TIME ZONE       │    │
+│   │  - datauttaksdato: TIMESTAMP WITH TIME ZONE         │    │
+│   │  - opphav: VARCHAR(255)                             │    │
+│   │  - ssid250m: VARCHAR(14)                            │    │
+│   │  - poptot: INTEGER                                  │    │
+│   │  - statistikkaar: INTEGER                           │    │
+│   │  - geometry: GEOMETRY(MultiPolygon,25833)           │    │
+│   │                                                     │    │
+│   │ Indexes:                                            │    │
+│   │  - ..._pkey: UNIQUE                                 │    │
+│   │  - ..._geometry_geom_idx: GIST                      │    │
+│   │                                                     │    │
+│   └─────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────┘
 ```
 
-# 2. Deliverable 1 - Webutvikling, GIS, Kartografi
+# Deliverable 1 - Webutvikling, GIS, Kartografi
 
 ## 1. Further Improvements
 
@@ -210,7 +234,7 @@ low supply and provide routes to get supplies, accounting for threats.
   - extract all sql queries into a seperate stored functions or prodecures
   - use the stored functions and procedures in the backend instead of raw SQL
 
-# 3. Deliverable 2 - GIScience og Romling Analyse
+# Deliverable 2 - GIScience og Romling Analyse
 ## 1. Section A
 
 ### 1. Overview
@@ -307,6 +331,8 @@ The ShelterLog application calculates optimal routes to the nearest emergency sh
    - Path is added as a new layer on the interactive map
    - Information about the shelter is displayed
 
+---
+
 ### 2. Dynamic SQL
 
 #### How "Find Nearest Shelter" Uses Dynamic SQL
@@ -348,6 +374,7 @@ The ShelterLog application calculates optimal routes to the nearest emergency sh
    ) t;
    $$ LANGUAGE sql IMMUTABLE STRICT;
    ```
+---
 
 ### 3. ST-functions
 
@@ -408,19 +435,21 @@ The `get_nvdb_roads_geojson` is a stored function that retrieves road network da
    - Uses spatial index for O(log n) performance instead of O(n) table scan
    - Returns road graph with segments that intersect the bounding box
 
+---
+
 ### 4. User Interface
 
 **Overview**
 
 The user interface is an interactive map where users can find the nearest shelter
-by clicking a button. The shortest path to a shelter is calculated and displayed..
+by clicking a button. The shortest path to a shelter is calculated and displayed.
 
 #### Finding Shelter
-<img width="498" height="74" alt="image" src="https://github.com/user-attachments/assets/4f378327-db70-4119-8899-38e18f29b366" />
+<img width="517" height="63" alt="image" src="https://github.com/user-attachments/assets/812b2659-e7d7-4307-bd3f-45d0834f6763" />
 
-- User clicks the "Find Nearest Shelter" button on the map interface
+- User clicks the "Find Shelter" button on the map interface
 - A loading animation is displayed while the application runs the calculation
-    - Especially useful when fetching road graph from the database
+    - Especially useful when fetching road graph from the database, as it can take a few seconds
 
 
 #### Path Display
@@ -430,8 +459,7 @@ by clicking a button. The shortest path to a shelter is calculated and displayed
 - The map is automatically fitted to the bounds of the path
 - Information about the shelter is displayed
 
-
-### 5. Further Improvements
+## 4. Further Improvements
 
 - NEW DATASET! Current doesn't cover Norway, one that does might be too big 
 - Routing function does not care about the concept of traffic laws
@@ -439,7 +467,7 @@ by clicking a button. The shortest path to a shelter is calculated and displayed
 - Use OSRM instead of own implementation
 - Make UI look nicer
 
-## 6. Setup Instructions
+## 4. Setup Instructions
 
 ### Clone Repository
 ```powershell
@@ -508,8 +536,6 @@ git clone https://github.com/sivert-svanes/IS-218-Prosjekt.git
 >     flask --app .\App\app.py run --debug
 >  ```
 </details>
-
-**Status**: Active Development | **Last Updated**: March 2026
 
 > [!IMPORTANT]
 > <details>
