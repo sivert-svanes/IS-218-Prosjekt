@@ -52,7 +52,7 @@ low supply and provide routes to get supplies, accounting for threats.
 | County Boundaries  | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) | GeoJSON  | Converted to PostGIS polygons for administrative filtering         |
 | Map Style          | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           | JSON     | Applied globe projection and custom styling                        |
 | FKB                | [Kartverket](https://wms.geonorge.no/skwms1/wms.fkb?service=wms&request=getcapabilities)                                | WMS      | Caching of tiles in memory and on disk                             |
-
+| Population Grid 250m | [GeoNorge](https://kartkatalog.geonorge.no/metadata/befolkning-paa-rutenett-250-m/0c0ad0ce-55e8-4d73-9c12-0eb0e2454acb) | FGDB → GeoPackage | Imported to PostGIS, used for population aggregation and coverage analysis |
 ## 5. Architecture Overview
 
 ## 1. Application Architecture
@@ -212,6 +212,73 @@ low supply and provide routes to get supplies, accounting for threats.
 
 # 3. Deliverable 2 - GIScience og Romling Analyse
 ## 1. Section A
+
+### 1. Overview
+
+This section presents a spatial analysis of emergency shelters and population distribution in Agder, conducted in a Jupyter Notebook.
+
+The analysis investigates how well shelters are geographically distributed relative to where people live, and identifies areas with potential gaps in coverage.
+
+---
+
+### 2. Data & Tools
+
+**Datasets:**
+
+- Shelters (PostGIS – Supabase)  
+- County boundaries (Agder)  
+- Population grid (250m resolution)  
+- DEM (terrain raster data)  
+
+**Tools:**
+
+- pandas, geopandas → vector data processing  
+- sqlalchemy → database access (PostGIS)  
+- rasterio → raster analysis  
+- shapely → geometry handling  
+- matplotlib → visualization  
+
+---
+
+### 3. Analysis
+
+**Vector analysis:**
+
+- Filtering shelters to Agder  
+- 500m buffer around shelters  
+- Overlay with population grid  
+- Spatial aggregation of covered population  
+
+**Results:**
+
+- ~828 population cells covered  
+- ~20.56% of population within coverage  
+- ~1351 cells identified with high population and low coverage  
+
+---
+
+**Raster analysis:**
+
+- Slope derived from DEM  
+- Filtering of areas with slope > 30°  
+- Polygonization of steep areas  
+- Two hillshade visualizations  
+
+This provides insight into terrain conditions that may affect accessibility.
+
+---
+
+### 4. Key Insight
+
+The analysis shows that shelter coverage is uneven, with large parts of the population located outside immediate reach.
+
+GIS methods such as buffer, overlay, and raster analysis are effective for identifying these spatial patterns.
+
+---
+
+### 5. Notebook Link
+
+[Open Notebook analysis](notebooks/analysis.ipynb)
 
 ## 2. Section B
 
