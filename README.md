@@ -459,8 +459,6 @@ by clicking a button. The shortest path to a shelter is calculated and displayed
 - The map is automatically fitted to the bounds of the path
 - Information about the shelter is displayed
 
----
-
 ## 4. Further Improvements
 
 - NEW DATASET! Current doesn't cover Norway, one that does might be too big 
