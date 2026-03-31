@@ -106,6 +106,9 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - /api/nearest-shelters - Find k-nearest shelters    │  │
 │   │  - /api/wms-proxy - mem/disk cache for WMS raster     │  │
 │   │  - /api/nvdb/roads - Query road network data          │  │
+│   │                                                       │  │
+│   │  HTTP Methods:                                        │  │
+│   │  - Get_Index: POST - Renders index                    │  │
 │   └───────────────────────────────────────────────────────┘  │
 └──────────────────────┬───────────────────────────────────────┘
                        │ PL/pgSQL Stored Functions
@@ -186,6 +189,28 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │                                                     │    │
 │   │ Storage:                                            │    │
 │   │  - geom_4326: TOAST Compressed                      │    │
+│   └─────────────────────────────────────────────────────┘    │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: befolkning_rutenett_250m_2025                │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - ogc_fid: INTEGER, PK                             │    │
+│   │  - objtype: VARCHAR(32)                             │    │
+│   │  - lokalid: VARCHAR(100)                            │    │
+│   │  - navnerom: VARCHAR(100)                           │    │
+│   │  - versjonid: VARCHAR(100)                          │    │
+│   │  - oppdateringsdato: TIMESTAMP WITH TIME ZONE       │    │
+│   │  - datauttaksdato: TIMESTAMP WITH TIME ZONE         │    │
+│   │  - opphav: VARCHAR(255)                             │    │
+│   │  - ssid250m: VARCHAR(14)                            │    │
+│   │  - poptot: INTEGER                                  │    │
+│   │  - statistikkaar: INTEGER                           │    │
+│   │  - geometry: GEOMETRY(MultiPolygon,25833)           │    │
+│   │                                                     │    │
+│   │ Indexes:                                            │    │
+│   │  - ..._pkey: UNIQUE                                 │    │
+│   │  - ..._geometry_geom_idx: GIST                      │    │
+│   │                                                     │    │
 │   └─────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────┘
 ```
