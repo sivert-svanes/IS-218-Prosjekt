@@ -1,12 +1,7 @@
 ﻿/**
  * Heavily based on https://github.com/birkskyum/maplibre-gl-stars/tree/main
  */
-
-export interface StarsLayerOptions {
-  id?: string;
-  intensity?: number;
-  density?: number;
-}
+import { StarsLayerOptions } from './interfaces.js';
 
 export function createStarsLayer(options: StarsLayerOptions = {}) {
   const intensity = options.intensity || 20.0;

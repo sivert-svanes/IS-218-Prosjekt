@@ -1,24 +1,12 @@
 ﻿import type * as MaplibreGL from "maplibre-gl";
 import { AddShortestPathLayer, ClearShortestPathLayer } from "./layer.js";
+import { GraphNode, RoadSegment, CacheBounds } from "./interfaces.js";
 
 let roadNetworkCache: any = null;
-let roadNetworkCacheBounds: { minLat: number; maxLat: number; minLng: number; maxLng: number } | null = null;
+let roadNetworkCacheBounds: CacheBounds | null = null;
 const WGS84_CONSTANT = 20037508.34;
 const ROAD_TYPES = 'Enkel%20bilveg,Bilferje,Rampe,Rundkj%C3%B8ring,Kanalisert%20veg';
 
-interface GraphNode {
-  id: string;
-  neighbors: Array<{ nodeId: string; segment: any }>;
-  lat: number;
-  lng: number;
-}
-
-interface RoadSegment {
-  coordinates: [number, number][];
-  distance: number;
-  start: any;
-  end: any;
-}
 
 const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
   const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLng = (lng2 - lng1) * Math.PI / 180;
