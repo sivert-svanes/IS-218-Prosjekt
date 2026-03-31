@@ -272,7 +272,7 @@ This provides insight into terrain conditions that may affect accessibility.
 
 The analysis shows that shelter coverage is uneven, with large parts of the population located outside immediate reach.
 
-GIS methods such as buffer, overlay and raster analysis are effective for identifying these spatial patterns.
+GIS methods such as buffer, overlay, and raster analysis are effective for identifying these spatial patterns.
 
 ---
 
