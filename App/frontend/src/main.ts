@@ -1,27 +1,11 @@
-﻿import type * as MaplibreGL from 'maplibre-gl';
-import {
-  AddLayerObject,
-  LayerSpecification,
-  LngLatLike,
-  PropertyValueSpecification
-} from "maplibre-gl";
+﻿import { AddLayerObject, LayerSpecification, LngLatLike, PropertyValueSpecification } from "maplibre-gl";
 import { registerKonamiCode } from './middleEarth.js';
 import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer} from './layer.js'
 import {registerStyleInMenu, initializeDropdownMenus} from './layerControl.js'
 import {registerStyle} from "./mapStyles.js";
 import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
 import { getMapStyle, GLOBE_FADE_CONFIG, DARK_PAINTS } from './mapStyles.js';
-
-declare global {
-  interface Window {
-    // The global injected by the CDN; optional because it may not be present in some environments
-    maplibregl?: typeof MaplibreGL;
-    // Exposed for debugging
-    map?: MaplibreGL.Map;
-    // Debug override for geolocation (for testing with DevTools sensor)
-    debugGeoLocation?: { lat: number; lng: number };
-  }
-}
+import './interfaces.js';
 
 const maplibregl = window.maplibregl;
 if (!maplibregl) {

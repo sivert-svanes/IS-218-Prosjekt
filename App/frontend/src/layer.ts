@@ -3,15 +3,7 @@ import {
   layerCheckboxes,
   registerLayer,
 } from './layerControl.js';
-
-declare global {
-  interface Window {
-    // The global injected by the CDN; optional because it may not be present in some environments
-    maplibregl?: typeof MaplibreGL;
-    // Exposed for debugging
-    map?: MaplibreGL.Map;
-  }
-}
+import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId, MapBounds } from './interfaces.js';
 
 const maplibregl = window.maplibregl;
 
@@ -69,21 +61,6 @@ const DSB_WMS_LAYERS: { name: string; title: string }[] = [
   { name: 'layer_443', title: 'Nødnett dekning kjøretøymontert' },
 ];
 
-interface WmsRasterLayerConfig {
-  sourceId: string;
-  layerId: string;
-  label: string;
-  tileUrl: string;
-  opacity?: number;
-}
-
-/**
- * Generic function to add WMS layers from a configuration array
- * @param map The MapLibre map instance
- * @param layers Array of layer configurations with name and title
- * @param configBuilder Function that builds the tile URL and layer config from a layer
- * @param visible Whether the layers start visible
- */
 function addWmsLayers<T extends { name: string; title: string }>(
   map: MaplibreGL.Map,
   layers: T[],
@@ -262,13 +239,6 @@ function calculateBounds(coordinates: [number, number][]): { minLng: number; max
  * @param destinationShelterFylkeId The fylke ID where the shelter is located (optional)
  * @param shelterFeature The shelter feature to display popup for (optional)
  */
-interface ShelterFeatureProperties {
-  fylkeId: number;
-  [key: string]: unknown;
-}
-
-type ShelterFeature = GeoJSON.Feature<GeoJSON.Point, ShelterFeatureProperties>;
-type ShelterFylkeId = ShelterFeatureProperties['fylkeId'];
 
 export function AddShortestPathLayer(
   map: MaplibreGL.Map,

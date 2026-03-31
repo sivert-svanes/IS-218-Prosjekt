@@ -1,5 +1,6 @@
 ﻿import type { StyleSpecification } from 'maplibre-gl';
 import type * as MaplibreGL from "maplibre-gl";
+import { RegisterStyleOptions} from './interfaces.js'
 
 export const GLOBE_FADE_CONFIG = {
   LIGHT_THETA_DEG: -37,
@@ -101,23 +102,6 @@ export type MapStyleKey = keyof typeof mapStyles;
 export const getMapStyle = (styleKey: MapStyleKey = 'default') => {
   return mapStyles[styleKey].style;
 };
-
-
-/**
- * Registers a tiled layer with the map, including its source.
- * Supports both raster and vector tile sources with opacity fade control.
- * @param map The MapLibre map instance
- * @param options Configuration for the layer registration
- */
-export interface RegisterStyleOptions {
-  id: string;
-  tiles: string[];
-  type: 'raster' | 'vector';
-  tileSize?: number;
-  attribution?: string;
-  fadeZoomStart?: number;
-  fadeZoomEnd?: number;
-}
 
 export function registerStyle(map: MaplibreGL.Map, options: RegisterStyleOptions): void {
   const {
