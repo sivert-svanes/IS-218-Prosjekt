@@ -278,7 +278,7 @@ GIS methods such as buffer, overlay, and raster analysis are effective for ident
 
 ### 5. Notebook Link
 
-[Open Notebook analysis](https://github.com/sivert-svanes/IS-218-Prosjekt/blob/af150f86af79bb8c5879b18ebbfb97f60acea40d/notebooks/analysis.ipynb)
+[Open Notebook analysis](notebooks/analysis.ipynb)
 
 ## 2. Section B
 
