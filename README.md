@@ -61,25 +61,40 @@ low supply and provide routes to get supplies, accounting for threats.
 ┌──────────────────────────────────────────────────────────────┐
 │                 Frontend (TypeScript/MapLibre)               │
 │   ┌───────────────────────────────────────────────────────┐  │
-│   │ main.ts - Application Entry Point                     │  │
-│   │  - Initializes map and loads all layers               │  │
-│   │  - Manages geolocation and user interaction           │  │
+│   │ main.ts - Application Entry Point & Map Manager       │  │
+│   │  - Initializes MapLibre map with globe projection     │  │
+│   │  - Manages geolocation                                │  │
+│   │  - Loads dynamic layers                               │  │
+│   │                                                       │  │                                                    │  │
+│   │ layer.ts - Data Loading                               │  │
+│   │  - Functions for adding data layers to the map        │  │
+│   │  - Fetch and cache WMS raster tiles                   │  │
 │   │                                                       │  │
-│   │ layer.ts - Layer Management                           │  │
-│   │  - AddShelterLayerGeospatial: Load shelter data       │  │
-│   │  - AddShortestPathLayer: Display calculated routes    │  │
-│   │  - registerLayer: Register layers in dropdown menu    │  │
+│   │ layerControl.ts - Manages UI and layers               │  │
+│   │  - Manages dropdown menus for layer toggling          │  │
+│   │  - Functions for regestering styles and layers        │  │
 │   │                                                       │  │
-│   │ shortestPath.ts - Pathfinding & Routing Logic         │  │
-│   │  - calculateShortestPath: A* algorithm implementation │  │
-│   │  - findNearestShelters: Query API for nearest         │  │
-│   │  - Handle path visualization on map                   │  │
+│   │ shortestPath.ts - Pathfinding & Route Calculation     │  │
+│   │  - Implements A* algorithm for path finding           │  │
+│   │  - Fetches and caches road network data               │  │
 │   │                                                       │  │
-│   │ starsLayer.ts - Custom Visualization Layer            │  │
-│   │  - Add custom styling and effects to map              │  │
+│   │ mapStyles.ts - Map Styling & Visual Effects           │  │
+│   │  - Defines base style and custom styles               │  │
+│   │  - Registrers new styles                              │  │
 │   │                                                       │  │
-│   │ types/ - TypeScript Type Definitions                  │  │
-│   │  - maplibre-gl-augmentations.d.ts: Extended types     │  │
+│   │ starsLayer.ts - Custom WebGL Star Field               │  │
+│   │  - Generates procedural star field using WebGL        │  │
+│   │  - Renders with camera-relative parrallax             │  │
+│   │  - Because its cool                                   │  │
+│   │                                                       │  │
+│   │ interfaces.ts - TypeScript Type Definitions           │  │
+│   │  - Shelter features and WMS layer configurations      │  │
+│   │  - Graph node and road segment types                  │  │
+│   │  - Bounding box and cache types                       │  │
+│   │                                                       │  │
+│   │ types/ - Extended Type Definitions                    │  │
+│   │  - MapLibre GL window augmentations                   │  │
+│   │  - Debug geolocation override interface               │  │
 │   └───────────────────────────────────────────────────────┘  │
 └──────────────────────┬───────────────────────────────────────┘
                        │ HTTP API
@@ -284,7 +299,9 @@ The `get_nvdb_roads_geojson` is a stored function that retrieves road network da
         p_max_lat FLOAT8,
         p_road_types TEXT[] DEFAULT NULL
     )
-        --GEOJSON FeatureCollection of road, removed for brevity
+    RETURNS JSON AS $$
+        SELECT
+        --GEOJSON FeatureCollection of roads, removed for brevity
         FROM public.nvdb_roads
         WHERE ST_Intersects(
             geom_4326,
@@ -305,7 +322,7 @@ The `get_nvdb_roads_geojson` is a stored function that retrieves road network da
 2. **Example**
    ```sql
    --Envelope snippet
-   ST_MakeEnvelope(p_min_lng, p_min_lat, p_max_lng, p_max_lat, 4326)
+    ST_MakeEnvelope(p_min_lng, p_min_lat, p_max_lng, p_max_lat, 4326)
    ```
    - Creates polygon based on the haversine distance between the user's location and the nearest shelters
    - Enables efficient spatial comparison with road geometries
