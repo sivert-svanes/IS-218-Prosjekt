@@ -214,9 +214,9 @@ low supply and provide routes to get supplies, accounting for threats.
 └──────────────────────────────────────────────────────────────┘
 ```
 
-## 4. Deliverable 1 - Webutvikling, GIS, Kartografi
+# Deliverable 1 - Webutvikling, GIS, Kartografi
 
-### 1. Further Improvements
+## 1. Further Improvements
 
 - base back-end of the project
   - Begin creating a more robust front-end
@@ -234,10 +234,10 @@ low supply and provide routes to get supplies, accounting for threats.
   - extract all sql queries into a seperate stored functions or prodecures
   - use the stored functions and procedures in the backend instead of raw SQL
 
-## 5. Deliverable 2 - GIScience og Romling Analyse
-### 1. Section A
+# Deliverable 2 - GIScience og Romling Analyse
+## 1. Section A
 
-#### 1. Overview
+### 1. Overview
 
 This section presents a spatial analysis of emergency shelters and population distribution in Agder, conducted in a Jupyter Notebook.
 
@@ -245,7 +245,7 @@ The analysis investigates how well shelters are geographically distributed relat
 
 ---
 
-#### 2. Data & Tools
+### 2. Data & Tools
 
 **Datasets:**
 
@@ -264,7 +264,7 @@ The analysis investigates how well shelters are geographically distributed relat
 
 ---
 
-#### 3. Analysis
+### 3. Analysis
 
 **Vector analysis:**
 
@@ -292,7 +292,7 @@ This provides insight into terrain conditions that may affect accessibility.
 
 ---
 
-#### 4. Key Insight
+### 4. Key Insight
 
 The analysis shows that shelter coverage is uneven, with large parts of the population located outside immediate reach.
 
@@ -300,13 +300,13 @@ GIS methods such as buffer, overlay, and raster analysis are effective for ident
 
 ---
 
-#### 5. Notebook Link
+### 5. Notebook Link
 
 [Open Notebook analysis](notebooks/analysis.ipynb)
 
-### 2. Section B
+## 2. Section B
 
-#### 1. Overview
+### 1. Overview
 
 **Shortest Path Calculation Process**
 
@@ -331,9 +331,11 @@ The ShelterLog application calculates optimal routes to the nearest emergency sh
    - Path is added as a new layer on the interactive map
    - Information about the shelter is displayed
 
-#### 2. Dynamic SQL
+---
 
-##### How "Find Nearest Shelter" Uses Dynamic SQL
+### 2. Dynamic SQL
+
+#### How "Find Nearest Shelter" Uses Dynamic SQL
 
 1. **User Geolocation Retrieval**
    - Frontend (`shortestPath.ts`) requests user's current location using MapLibre's built-in geolocation
@@ -372,8 +374,9 @@ The ShelterLog application calculates optimal routes to the nearest emergency sh
    ) t;
    $$ LANGUAGE sql IMMUTABLE STRICT;
    ```
+---
 
-#### 3. ST-functions
+### 3. ST-functions
 
 **PostGIS Spatial Functions in get_nvdb_roads_geojson**
 
@@ -402,7 +405,7 @@ The `get_nvdb_roads_geojson` is a stored function that retrieves road network da
     $$ LANGUAGE sql IMMUTABLE STRICT;
    ```
 
-##### ST_MakeEnvelope - Creating Bounding Box Geometry
+#### ST_MakeEnvelope - Creating Bounding Box Geometry
 
 
 
@@ -418,7 +421,7 @@ The `get_nvdb_roads_geojson` is a stored function that retrieves road network da
    - Creates polygon based on the haversine distance between the user's location and the nearest shelters
    - Enables efficient spatial comparison with road geometries
 
-##### ST_Intersects - Spatial Intersection Query
+#### ST_Intersects - Spatial Intersection Query
 
 1. **Intersection Check**
    ```sql
@@ -432,14 +435,16 @@ The `get_nvdb_roads_geojson` is a stored function that retrieves road network da
    - Uses spatial index for O(log n) performance instead of O(n) table scan
    - Returns road graph with segments that intersect the bounding box
 
-#### 4. User Interface
+---
+
+### 4. User Interface
 
 **Overview**
 
 The user interface is an interactive map where users can find the nearest shelter
 by clicking a button. The shortest path to a shelter is calculated and displayed.
 
-##### Finding Shelter
+#### Finding Shelter
 <img width="517" height="63" alt="image" src="https://github.com/user-attachments/assets/812b2659-e7d7-4307-bd3f-45d0834f6763" />
 
 - User clicks the "Find Shelter" button on the map interface
@@ -447,15 +452,16 @@ by clicking a button. The shortest path to a shelter is calculated and displayed
     - Especially useful when fetching road graph from the database, as it can take a few seconds
 
 
-##### Path Display
+#### Path Display
 <img width="1500" height="1191" alt="image" src="https://github.com/user-attachments/assets/46b55aec-b765-4549-959b-9003e17b3989" />
 
 - The shortest path is displayed as a blue line on the map
 - The map is automatically fitted to the bounds of the path
 - Information about the shelter is displayed
 
+---
 
-#### 5. Further Improvements
+## 4. Further Improvements
 
 - NEW DATASET! Current doesn't cover Norway, one that does might be too big 
 - Routing function does not care about the concept of traffic laws
@@ -463,9 +469,9 @@ by clicking a button. The shortest path to a shelter is calculated and displayed
 - Use OSRM instead of own implementation
 - Make UI look nicer
 
-### 7. Setup Instructions
+## 4. Setup Instructions
 
-#### Clone Repository
+### Clone Repository
 ```powershell
 git clone https://github.com/sivert-svanes/IS-218-Prosjekt.git
 ```
