@@ -52,7 +52,7 @@ low supply and provide routes to get supplies, accounting for threats.
 | County Boundaries  | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) | GeoJSON  | Converted to PostGIS polygons for administrative filtering         |
 | Map Style          | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           | JSON     | Applied globe projection and custom styling                        |
 | FKB                | [Kartverket](https://wms.geonorge.no/skwms1/wms.fkb?service=wms&request=getcapabilities)                                | WMS      | Caching of tiles in memory and on disk                             |
-
+| Population Grid 250m | [GeoNorge](https://kartkatalog.geonorge.no/metadata/befolkning-paa-rutenett-250-m/0c0ad0ce-55e8-4d73-9c12-0eb0e2454acb) | FGDB → GeoPackage | Imported to PostGIS, used for population aggregation and coverage analysis |
 ## 5. Architecture Overview
 
 ## 1. Application Architecture
@@ -276,9 +276,10 @@ GIS methods such as buffer, overlay and raster analysis are effective for identi
 
 ---
 
-### 5. Notebook
+### 5. Notebook Link
 
-https://github.com/sivert-svanes/IS-218-Prosjekt/blob/af150f86af79bb8c5879b18ebbfb97f60acea40d/notebooks/analysis.ipynb
+[Open Notebook analysis](https://github.com/sivert-svanes/IS-218-Prosjekt/blob/af150f86af79bb8c5879b18ebbfb97f60acea40d/notebooks/analysis.ipynb)
+
 ## 2. Section B
 
 ### 1. Overview

@@ -1,26 +1,45 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Title</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='/style/style.css')}}" onerror="href='../static/style/style.css';">
-  <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
-  <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
-</head>
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Title</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='/style/style.css')}}" onerror="href='../static/style/style.css';">
+    <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+    <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
+  </head>
 
-<body style="margin: 0;">
-  <div id="map" style="width: 100vw; height: 100vh;"></div>
-  <div class="map-overlay container">
-    <div class="header box prevent-select">Map Application</div>
-    <div class="dropdown">
-      <div class="box text prevent-select button dropdown-toggle" id="layers-toggle">Layers ▾</div>
+  <body style="margin: 0;">
+    <div id="map" style="width: 100vw; height: 100vh;"></div>
+    <div class="map-overlay container">
+      <div class="header box prevent-select">ShelterLog</div>
+
+      <div class="dropdown">
+        <div class="box text prevent-select button dropdown-toggle" id="layers-toggle">Layers ▾</div>
+      </div>
+
+      <div class="dropdown">
+        <div class="box text prevent-select button dropdown-toggle" id="styles-toggle">Styles ▾</div>
+      </div>
+
+      <div class="box text prevent-select button" id="shortest-path-btn">
+        <span style="position: relative; z-index: 2;">Find Shelter</span>
+        <div class="loading-bar"></div>
+      </div>
+
+      <div class="box text prevent-select button" id="clear-path-btn" style="display: none;">
+        <span style="position: relative; z-index: 2;">✕</span>
+      </div>
     </div>
-    <div class="box text prevent-select button">Controls</div>
-  </div>
-  <div class="dropdown-menu" id="layers-menu"></div>
-  <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v={{ ts }}"
-        onerror="let s=document.createElement('script');s.type='module';s.src='../static/js/main.js';document.body.appendChild(s);">
-  </script>
-</body>
+
+    <div class="dropdown-menu" id="layers-menu"></div>
+
+    <div class="dropdown-menu" id="styles-menu">
+      <div class="dropdown-empty">No map styles available</div>
+    </div>
+
+    <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v={{ ts }}"
+          onerror="let s=document.createElement('script');s.type='module';s.src='../static/js/main.js';document.body.appendChild(s);">
+    </script>
+  </body>
 </html>
