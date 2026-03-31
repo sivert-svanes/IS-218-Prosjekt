@@ -45,14 +45,14 @@ low supply and provide routes to get supplies, accounting for threats.
 
 ## 4. Data Catalog
 
-| Dataset            | Source                                                                                                                  | Format   | Processing                                                         |
-|--------------------|-------------------------------------------------------------------------------------------------------------------------|----------|--------------------------------------------------------------------|
-| Emergency Shelters | [GeoNorge](https://kartkatalog.geonorge.no/metadata/tilfluktsrom-offentlige/dbae9aae-10e7-4b75-8d67-7f0e8828f3d8)       | GML      | Converted to PostGIS geometry, indexed for spatial queries         |
-| NVDB               | [Statens Vegvesen](https://www.nvdb.no/hent-og-se-data/eksport/nvdb-eksport/brukerveiledning/)                          | WKT(CSV) | Converted to PostGIS geometry, spatial indexing, TOAST compression |
-| County Boundaries  | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) | GeoJSON  | Converted to PostGIS polygons for administrative filtering         |
-| Map Style          | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           | JSON     | Applied globe projection and custom styling                        |
-| FKB                | [Kartverket](https://wms.geonorge.no/skwms1/wms.fkb?service=wms&request=getcapabilities)                                | WMS      | Caching of tiles in memory and on disk                             |
-| Population Grid 250m | [GeoNorge](https://kartkatalog.geonorge.no/metadata/befolkning-paa-rutenett-250-m/0c0ad0ce-55e8-4d73-9c12-0eb0e2454acb) | FGDB → GeoPackage | Imported to PostGIS, used for population aggregation and coverage analysis |
+| Dataset              | Source                                                                                                                  | Format   | Processing                                                                 |
+|----------------------|-------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------|
+| Emergency Shelters   | [GeoNorge](https://kartkatalog.geonorge.no/metadata/tilfluktsrom-offentlige/dbae9aae-10e7-4b75-8d67-7f0e8828f3d8)       | GML      | Converted to PostGIS geometry, indexed for spatial queries                 |
+| NVDB                 | [Statens Vegvesen](https://www.nvdb.no/hent-og-se-data/eksport/nvdb-eksport/brukerveiledning/)                          | WKT(CSV) | Converted to PostGIS geometry, spatial indexing, TOAST compression         |
+| County Boundaries    | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) | GeoJSON  | Converted to PostGIS polygons for administrative filtering                 |
+| Map Style            | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           | JSON     | Applied globe projection and custom styling                                |
+| FKB                  | [Kartverket](https://wms.geonorge.no/skwms1/wms.fkb?service=wms&request=getcapabilities)                                | WMS      | Caching of tiles in memory and on disk                                     |
+| Population Grid 250m | [GeoNorge](https://kartkatalog.geonorge.no/metadata/befolkning-paa-rutenett-250-m/0c0ad0ce-55e8-4d73-9c12-0eb0e2454acb) | FGDB     | Imported to PostGIS, used for population aggregation and coverage analysis |
 ## 5. Architecture Overview
 
 ## 1. Application Architecture
@@ -65,7 +65,7 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - Initializes MapLibre map with globe projection     │  │
 │   │  - Manages geolocation                                │  │
 │   │  - Loads dynamic layers                               │  │
-│   │                                                       │  │                                                    │  │
+│   │                                                       │  │
 │   │ layer.ts - Data Loading                               │  │
 │   │  - Functions for adding data layers to the map        │  │
 │   │  - Fetch and cache WMS raster tiles                   │  │
@@ -413,14 +413,13 @@ The `get_nvdb_roads_geojson` is a stored function that retrieves road network da
 **Overview**
 
 The user interface is an interactive map where users can find the nearest shelter
-by clicking a button. The shortest path to a shelter is calculated and displayed..
+by clicking a button. The shortest path to a shelter is calculated and displayed.
 
 #### Finding Shelter
-<img width="498" height="74" alt="image" src="https://github.com/user-attachments/assets/4f378327-db70-4119-8899-38e18f29b366" />
 
-- User clicks the "Find Nearest Shelter" button on the map interface
+- User clicks the "Find Shelter" button on the map interface
 - A loading animation is displayed while the application runs the calculation
-    - Especially useful when fetching road graph from the database
+    - Especially useful when fetching road graph from the database, as it can take a few seconds
 
 
 #### Path Display
