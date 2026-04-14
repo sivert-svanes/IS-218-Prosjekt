@@ -96,6 +96,39 @@ def api_fylke(fylke_id):
     geojson = database.get_shelters_within_fylke(engine, fylke_id)
     return flask.jsonify(geojson)
 
+@app.route('/api/valhalla-route', methods=['POST'])
+def valhalla_route():
+    """Proxy route requests to Valhalla routing engine to avoid CORS issues.
+
+    Expects JSON payload with:
+        - locations: list of {lat, lon} points
+        - costing: routing profile ('auto', 'pedestrian', etc.)
+        - exclude_polygons (optional): list of polygons to exclude
+
+    Returns: Valhalla route response with shape (encoded polyline) and summary
+    """
+    try:
+        payload = flask.request.get_json()
+        if not payload:
+            return flask.Response('Invalid payload', status=400)
+
+        # Call Valhalla API
+        valhalla_url = 'https://valhalla1.openstreetmap.de/route'
+        response = http_requests.post(valhalla_url, json=payload, timeout=10)
+
+        if response.status_code == 200:
+            return flask.Response(
+                response.content,
+                status=response.status_code,
+                content_type='application/json'
+            )
+        else:
+            return flask.Response(response.text, status=response.status_code, content_type='text/plain')
+    except Exception as e:
+        print(f'Valhalla proxy error: {e}')
+        traceback.print_exc()
+        return flask.Response(f'Valhalla error: {str(e)}', status=502)
+
 @app.route('/api/nearest-shelters')
 def api_nearest_shelters():
     """Get k nearest shelters to given coordinates.
