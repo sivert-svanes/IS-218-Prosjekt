@@ -1,81 +1,67 @@
 ﻿import type * as MaplibreGL from "maplibre-gl";
 import { AddShortestPathLayer, ClearShortestPathLayer } from "./layer.js";
 
-const OSRM_API_BASE = "http://router.project-osrm.org/route/v1/driving";
+const OSRM_API_BASE = "https://router.project-osrm.org/route/v1/driving";
+const OSRM_TIMEOUT_MS = 3000;
+const ROUTE_CACHE = new Map<string, any>();
 
-async function findNearestSheltersViaAPI(lat: number, lng: number, k: number = 10): Promise<any[]> {
+async function findNearestShelters(lat: number, lng: number, k: number = 5): Promise<any[]> {
   try {
     const response = await fetch(`/api/nearest-shelters?lat=${lat}&lng=${lng}&k=${k}`);
-    if (response.ok) {
-      const geojson = await response.json();
-      return geojson.features || [];
-    }
+    return response.ok ? await response.json().then(g => g.features || []) : [];
   } catch (err) {
-    console.error('Failed to fetch nearest shelters from API:', err);
+    console.error('Failed to fetch nearest shelters:', err);
+    return [];
   }
-  return [];
 }
 
 async function getOSRMRoute(userLng: number, userLat: number, shelterLng: number, shelterLat: number): Promise<any> {
+  const cacheKey = `${userLng},${userLat};${shelterLng},${shelterLat}`;
+  if (ROUTE_CACHE.has(cacheKey)) return ROUTE_CACHE.get(cacheKey);
+
   try {
     const url = `${OSRM_API_BASE}/${userLng},${userLat};${shelterLng},${shelterLat}?geometries=geojson&overview=full`;
-    const response = await fetch(url);
+    const timeoutPromise = new Promise<Response>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout')), OSRM_TIMEOUT_MS)
+    );
 
-    if (response.ok) {
+    const response = await Promise.race([fetch(url), timeoutPromise]) as Response;
+    if (response?.ok) {
       const data = await response.json();
-      if (data.routes && data.routes.length > 0) {
+      if (data.routes?.[0]) {
+        ROUTE_CACHE.set(cacheKey, data.routes[0]);
         return data.routes[0];
       }
     }
   } catch (err) {
-    console.error('Failed to fetch route from OSRM:', err);
+    console.error('Failed to fetch OSRM route:', err);
   }
   return null;
 }
 
-function extractPathCoordinates(route: any): [number, number][] {
-  if (route.geometry && route.geometry.coordinates) {
-    return route.geometry.coordinates;
-  }
-  return [];
-}
-
-
 export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, lng: number): Promise<void> {
   try {
-    // Get k=10 nearest shelters from database
-    const shelterFeatures = await findNearestSheltersViaAPI(lat, lng, 10);
-    if (shelterFeatures.length === 0) return;
+    const shelters = await findNearestShelters(lat, lng, 5);
+    if (!shelters.length) return;
 
-    let shortestRoute: any = null;
-    let shortestShelter: any = null;
-    let shortestDistance = Infinity;
+    const routes = await Promise.all(
+      shelters
+        .filter(s => s.geometry?.type === 'Point')
+        .map(async (shelter) => {
+          const [shelterLng, shelterLat] = shelter.geometry.coordinates;
+          return { route: await getOSRMRoute(lng, lat, shelterLng, shelterLat), shelter };
+        })
+    );
 
-    // Query OSRM for each shelter and find the one with the shortest route
-    for (const shelterFeature of shelterFeatures) {
-      if (shelterFeature.geometry.type !== 'Point') continue;
+    let best = routes.reduce((min, r) =>
+      (r.route && r.route.distance < (min.route?.distance ?? Infinity)) ? r : min,
+      { route: null as any, shelter: null as any }
+    );
 
-      const [shelterLng, shelterLat] = shelterFeature.geometry.coordinates;
-
-      const route = await getOSRMRoute(lng, lat, shelterLng, shelterLat);
-      if (!route) continue;
-
-      const distance = route.distance || Infinity;
-
-      // Keep track of the shelter with the shortest route distance
-      if (distance < shortestDistance) {
-        shortestDistance = distance;
-        shortestRoute = route;
-        shortestShelter = shelterFeature;
-      }
-    }
-
-    // Display the shortest route
-    if (shortestRoute && shortestShelter) {
-      const pathCoords = extractPathCoordinates(shortestRoute);
+    if (best.route && best.shelter) {
+      const pathCoords = best.route.geometry?.coordinates || [];
       if (pathCoords.length >= 2) {
-        const fylkeId = shortestShelter.properties?.fylke_id;
-        AddShortestPathLayer(map, pathCoords, fylkeId, shortestShelter);
+        AddShortestPathLayer(map, pathCoords, best.shelter.properties?.fylke_id, best.shelter);
       }
     }
   } catch (err) {
