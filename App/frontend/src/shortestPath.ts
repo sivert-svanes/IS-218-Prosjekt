@@ -6,6 +6,110 @@ const API_TIMEOUT_MS = 5000;
 const ROUTE_CACHE = new Map<string, any>();
 const REQUEST_DELAY_MS = 300;
 let lastRequestTime = 0;
+let exclusionZoneInitialized = false;
+
+// Hardcoded exclusion zone GeoJSON for testing
+const EXCLUSION_ZONE_GEOJSON: GeoJSON.FeatureCollection = {
+  type: "FeatureCollection",
+  features: [
+    {
+      type: "Feature",
+      properties: {},
+      geometry: {
+        coordinates: [
+          [
+            [8.002146669116485, 58.15867389469662],
+            [8.002146669116485, 58.156220484299666],
+            [8.013841355471442, 58.156220484299666],
+            [8.013841355471442, 58.15867389469662],
+            [8.002146669116485, 58.15867389469662]
+          ]
+        ],
+        type: "Polygon"
+      }
+    }
+  ]
+};
+
+// Exclusion zone bounds [minLng, minLat, maxLng, maxLat, minElevation, maxElevation]
+let exclusionZone: [number, number, number, number, number, number] | null = null;
+
+export function setExclusionZone(bounds: [number, number, number, number, number, number]): void {
+  exclusionZone = bounds;
+  console.log('Exclusion zone set (with height):', bounds);
+}
+
+export function clearExclusionZone(): void {
+  exclusionZone = null;
+  console.log('Exclusion zone cleared');
+}
+
+function isPointInZone(lng: number, lat: number, elevation: number, zone: [number, number, number, number, number, number]): boolean {
+  const [minLng, minLat, maxLng, maxLat, minElevation, maxElevation] = zone;
+  // Add buffer to make zone bigger and catch points on edges
+  const buffer = 0.0001;
+  return lng >= (minLng - buffer) && lng <= (maxLng + buffer) &&
+         lat >= (minLat - buffer) && lat <= (maxLat + buffer) &&
+         elevation >= minElevation && elevation <= maxElevation;
+}
+
+function routePassesThroughZone(coords: [number, number][], zone: [number, number, number, number, number, number]): boolean {
+  // Check if ANY point in the route is in the zone (assume elevation 0 for 2D coordinates)
+  return coords.some(([lng, lat]) => isPointInZone(lng, lat, 0, zone));
+}
+
+export function initializeExclusionZoneLayer(map: MaplibreGL.Map): void {
+  const sourceId = 'exclusion-zone-source';
+  const layerId = 'exclusion-zone-layer';
+
+  // Remove if already exists
+  if (map.getLayer(layerId)) map.removeLayer(layerId);
+  if (map.getSource(sourceId)) map.removeSource(sourceId);
+
+  map.addSource(sourceId, {
+    type: 'geojson',
+    data: EXCLUSION_ZONE_GEOJSON
+  });
+
+  // Add fill layer
+  map.addLayer({
+    id: layerId,
+    type: 'fill',
+    source: sourceId,
+    paint: {
+      'fill-color': '#ff0000',
+      'fill-opacity': 0.3
+    }
+  });
+
+  // Add outline layer
+  map.addLayer({
+    id: `${layerId}-outline`,
+    type: 'line',
+    source: sourceId,
+    paint: {
+      'line-color': '#ff0000',
+      'line-width': 2,
+      'line-opacity': 0.8
+    }
+  });
+
+  // Extract bounds and set exclusion zone with height
+  const coords = (EXCLUSION_ZONE_GEOJSON.features[0].geometry as GeoJSON.Polygon).coordinates[0];
+  const lngs = coords.map(c => c[0]);
+  const lats = coords.map(c => c[1]);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+
+  // Set elevation bounds: from ground level (-1000m) to very high (10000m) to block all routes including tunnels
+  const minElevation = -1000;
+  const maxElevation = 10000;
+
+  setExclusionZone([minLng, minLat, maxLng, maxLat, minElevation, maxElevation]);
+  console.log('Exclusion zone layer initialized with bounds:', [minLng, minLat, maxLng, maxLat, minElevation, maxElevation]);
+}
 
 async function delayForRateLimit(): Promise<void> {
   const delayNeeded = REQUEST_DELAY_MS - (Date.now() - lastRequestTime);
@@ -32,17 +136,33 @@ async function getRoute(userLng: number, userLat: number, shelterLng: number, sh
   try {
     await delayForRateLimit();
 
+    const requestBody: any = {
+      locations: [
+        { lat: userLat, lon: userLng },
+        { lat: shelterLat, lon: shelterLng }
+      ],
+      costing: 'auto'
+    };
+
+    // Add exclusion zone to request if it exists
+    if (exclusionZone) {
+      const [minLng, minLat, maxLng, maxLat, minElevation, maxElevation] = exclusionZone;
+      requestBody.exclude_polygons = [
+        [
+          [minLng, minLat],
+          [maxLng, minLat],
+          [maxLng, maxLat],
+          [minLng, maxLat],
+          [minLng, minLat]
+        ]
+      ];
+    }
+
     const response = await Promise.race([
       fetch('/api/valhalla-route', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          locations: [
-            { lat: userLat, lon: userLng },
-            { lat: shelterLat, lon: shelterLng }
-          ],
-          costing: 'auto'
-        })
+        body: JSON.stringify(requestBody)
       }),
       new Promise<Response>((_, reject) =>
         setTimeout(() => reject(new Error('Timeout')), API_TIMEOUT_MS)
@@ -94,26 +214,38 @@ function decodePolyline(encoded: string): [number, number][] {
 
 export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, lng: number): Promise<void> {
   try {
+    // Initialize exclusion zone layer on first call
+    if (!exclusionZoneInitialized) {
+      initializeExclusionZoneLayer(map);
+      exclusionZoneInitialized = true;
+    }
+
     const shelters = await findNearestShelters(lat, lng, 5);
     if (!shelters.length) return;
 
     const shelter = shelters[0];
     const [shelterLng, shelterLat] = shelter.geometry.coordinates;
-    const route = await getRoute(lng, lat, shelterLng, shelterLat);
+    let route = await getRoute(lng, lat, shelterLng, shelterLat);
 
     if (!route) return;
 
-    const shape = route.shape || route.legs?.[0]?.shape;
+    let shape = route.shape || route.legs?.[0]?.shape;
     if (!shape) {
       console.warn('No shape found in route');
       return;
     }
 
-    const pathCoords = decodePolyline(shape);
+    let pathCoords = decodePolyline(shape);
     if (pathCoords.length < 2) {
       console.warn('Not enough coordinates:', pathCoords.length);
       return;
     }
+
+    console.log('Path coordinates count:', pathCoords.length);
+    console.log('Exclusion zone active:', exclusionZone ? 'yes' : 'no');
+    console.log('First path point:', pathCoords[0]);
+    console.log('Last path point:', pathCoords[pathCoords.length - 1]);
+
 
     const shelterFeature: ShelterFeature = shelter.type === 'Feature'
       ? (shelter as ShelterFeature)
