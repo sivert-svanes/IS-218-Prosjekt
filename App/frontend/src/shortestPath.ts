@@ -3,17 +3,17 @@ import { AddShortestPathLayer, ClearShortestPathLayer } from "./layer.js";
 import type { ShelterFeature } from "./interfaces.js";
 import { getExclusionZones } from "./exclusion.js";
 
-const API_TIMEOUT_MS = 10000;
+const API_TIMEOUT_MS = 20000;
 const ROUTE_CACHE = new Map<string, any>();
-const REQUEST_DELAY_MS = 100;
-const NUM_ROUTES_TO_FETCH = 10;
-
+const REQUEST_DELAY_MS = 65;
+const NUM_ROUTES_TO_CALCULATE = 10;
+const NUM_SHELTERS_TO_REQUEST = 15;
 
 async function delayForRateLimit(): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY_MS));
 }
 
-async function findNearestShelters(lat: number, lng: number, k: number = NUM_ROUTES_TO_FETCH): Promise<any[]> {
+async function findNearestShelters(lat: number, lng: number, k: number = NUM_SHELTERS_TO_REQUEST): Promise<any[]> {
   try {
     const response = await fetch(`/api/nearest-shelters?lat=${lat}&lng=${lng}&k=${k}`);
     return response.ok ? (await response.json()).features || [] : [];
@@ -27,45 +27,59 @@ async function getRoute(userLng: number, userLat: number, trgLng: number, trgLat
   const cacheKey = `${userLng},${userLat};${trgLng},${trgLat}`;
   if (ROUTE_CACHE.has(cacheKey)) return ROUTE_CACHE.get(cacheKey);
 
-  try {
-    await delayForRateLimit();
+  // Simple retry logic for rate limits
+  const MAX_RETRIES = 2;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    try {
+      await delayForRateLimit();
 
-    const requestBody: any = {
-      locations: [
-        { lat: userLat, lon: userLng },
-        { lat: trgLat, lon: trgLng }
-      ],
-      costing: 'auto'
-    };
+      const requestBody: any = {
+        locations: [
+          { lat: userLat, lon: userLng },
+          { lat: trgLat, lon: trgLng }
+        ],
+        costing: 'auto'
+      };
 
-    // Add all exclusion zones as polygons
-    const zones = getExclusionZones();
-    if (zones.length > 0) {
-      requestBody.exclude_polygons = zones.map(zone => {
-        const [minLng, minLat, maxLng, maxLat] = zone;
-        return [[minLng, minLat], [maxLng, minLat], [maxLng, maxLat], [minLng, maxLat], [minLng, minLat]];
-      });
-    }
-
-    const response = await Promise.race([
-      fetch('/api/valhalla-route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestBody)
-      }),
-      new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('Timeout')), API_TIMEOUT_MS))
-    ]) as Response;
-
-    if (response?.ok) {
-      const data = await response.json();
-      const route = data.routes?.[0] || data.trip;
-      if (route) {
-        ROUTE_CACHE.set(cacheKey, route);
-        return route;
+      // Add all exclusion zones as polygons
+      const zones = getExclusionZones();
+      if (zones.length > 0) {
+        requestBody.exclude_polygons = zones.map(zone => {
+          const [minLng, minLat, maxLng, maxLat] = zone;
+          return [[minLng, minLat], [maxLng, minLat], [maxLng, maxLat], [minLng, maxLat], [minLng, minLat]];
+        });
       }
+
+      const response = await Promise.race([
+        fetch('/api/valhalla-route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        }),
+        new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('Timeout')), API_TIMEOUT_MS))
+      ]) as Response;
+
+      if (response?.ok) {
+        const data = await response.json();
+        const route = data.routes?.[0] || data.trip;
+        if (route) {
+          ROUTE_CACHE.set(cacheKey, route);
+          return route;
+        }
+      } else if (response?.status === 429) {
+        // Rate limited - retry with exponential backoff
+        if (attempt < MAX_RETRIES) {
+          const waitTime = 1000 * Math.pow(2, attempt);
+          console.warn(`Rate limited (429). Waiting ${waitTime}ms before retry...`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
+        }
+      } else if (response?.status === 400) {
+        console.warn('Bad request (e.g., no path found or route blocked by exclusions)');
+        return null;
+      }
+    } catch (err) {
+      console.error('Failed to fetch route:', err);
     }
-  } catch (err) {
-    console.error('Failed to fetch route:', err);
   }
   return null;
 }
@@ -100,28 +114,29 @@ function decodePolyline6(encoded: string): [number, number][] {
 
 export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, lng: number): Promise<void> {
   try {
-
-    const shelters = await findNearestShelters(lat, lng, NUM_ROUTES_TO_FETCH);
+    const shelters = await findNearestShelters(lat, lng, NUM_SHELTERS_TO_REQUEST);
     if (!shelters.length) return;
 
-    // Fetch routes sequentially so we don't get rate limited
     const routeResults = [];
     for (const shelter of shelters) {
       const [shelterLng, shelterLat] = shelter.geometry.coordinates;
       const route = await getRoute(lng, lat, shelterLng, shelterLat);
-      routeResults.push({ shelter, route, distance: route?.summary?.length || Infinity });
+
+      if (route) {
+        routeResults.push({ shelter, route, distance: route.summary?.length || Infinity });
+        if (routeResults.length >= NUM_ROUTES_TO_CALCULATE) break;
+      }
     }
 
-    // Find shortest route
-    const shortest = routeResults.reduce((best, current) =>
-      current.route && current.distance < best.distance ? current : best,
-      { route: null, distance: Infinity, shelter: null }
-    );
-
-    if (!shortest.route || !shortest.shelter) {
-      console.warn('No valid routes found');
+    // If no valid routes found, warn and return
+    if (!routeResults.length) {
+      console.warn('No valid routes found for any shelter');
       return;
     }
+
+    const shortest = routeResults.reduce((best, current) =>
+      current.distance < best.distance ? current : best
+    );
 
     const shape = shortest.route.shape || shortest.route.legs?.[0]?.shape;
     if (!shape) return console.warn('No shape found in route');
