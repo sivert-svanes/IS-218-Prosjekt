@@ -159,6 +159,18 @@ def api_nearest_shelters():
         traceback.print_exc()
         return flask.jsonify({"type": "FeatureCollection", "features": []})
 
+@app.route('/api/exclusion-zones')
+def api_exclusion_zones():
+    """Get all exclusion zones as a GeoJSON FeatureCollection."""
+    try:
+        engine = database.create_engine()
+        geojson = database.get_exclusion_zones(engine)
+        return flask.jsonify(geojson)
+    except Exception as e:
+        print(f"Error fetching exclusion zones: {e}")
+        traceback.print_exc()
+        return flask.jsonify({"type": "FeatureCollection", "features": []})
+
 @app.route('/api/nvdb/roads')
 def api_nvdb_roads():
     """Fetch NVDB road segments as GeoJSON from PostGIS.

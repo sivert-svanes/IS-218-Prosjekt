@@ -319,3 +319,71 @@ export function ClearShortestPathLayer(map: MaplibreGL.Map): void {
   const btn = document.getElementById('clear-path-btn');
   if (btn) btn.style.display = 'none';
 }
+
+/**
+ * Adds exclusion zones layer to the map and registers it with layer control.
+ * @param map The MapLibre map instance
+ * @param geojsonData The GeoJSON FeatureCollection with exclusion zones
+ */
+export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON.FeatureCollection): void {
+  const sourceId = 'exclusion-zones-source';
+  const layerId = 'exclusion-zones-layer';
+  const outlineLayerId = `${layerId}-line`;
+
+  // Remove existing layers and source if they exist
+  if (map.getLayer(outlineLayerId)) map.removeLayer(outlineLayerId);
+  if (map.getLayer(layerId)) map.removeLayer(layerId);
+  if (map.getSource(sourceId)) map.removeSource(sourceId);
+
+  // Add source with all exclusion zones
+  map.addSource(sourceId, {
+    type: 'geojson',
+    data: geojsonData
+  });
+
+  // Add fill layer
+  map.addLayer({
+    id: layerId,
+    type: 'fill',
+    source: sourceId,
+    paint: {
+      'fill-color': '#ff0000',
+      'fill-opacity': 0.3
+    }
+  });
+
+  // Add line layer on top for visible outline
+  map.addLayer({
+    id: outlineLayerId,
+    type: 'line',
+    source: sourceId,
+    paint: {
+      'line-color': '#ff0000',
+      'line-width': 2,
+      'line-opacity': 0.8
+    }
+  });
+
+  // Register only the fill layer, and sync outline visibility with it
+  registerLayer(layerId, 'Exclusion Zones', true, map);
+
+  // Sync the outline layer visibility with the fill layer
+  const originalSetLayoutProperty = map.setLayoutProperty.bind(map);
+  const syncVisibility = (layerIdToSync: string, visibility: string) => {
+    if (layerIdToSync === layerId) {
+      originalSetLayoutProperty(outlineLayerId, 'visibility', visibility);
+    }
+  };
+
+  // Override setLayoutProperty to sync visibility
+  const originalMethod = map.setLayoutProperty;
+  (map as any).setLayoutProperty = function(layerIdToOverride: string, name: string, value: any) {
+    originalSetLayoutProperty(layerIdToOverride, name, value);
+    if (name === 'visibility') {
+      syncVisibility(layerIdToOverride, value);
+    }
+    return this;
+  };
+}
+
+

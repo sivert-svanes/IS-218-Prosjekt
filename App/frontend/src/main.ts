@@ -1,9 +1,15 @@
 ﻿import { AddLayerObject, LayerSpecification, LngLatLike, PropertyValueSpecification } from "maplibre-gl";
 import { registerKonamiCode } from './middleEarth.js';
-import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer} from './layer.js'
+import {
+  AddShelterLayerGeospatial,
+  AddDSBWmsLayers,
+  AddVannOgVassdragLayers,
+  AddFKBVeiLayer,
+} from './layer.js'
 import {registerStyleInMenu, initializeDropdownMenus} from './layerControl.js'
 import {registerStyle} from "./mapStyles.js";
 import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
+import { initializeExclusionZones } from './exclusion.js'
 import { getMapStyle, GLOBE_FADE_CONFIG, DARK_PAINTS } from './mapStyles.js';
 import './interfaces.js';
 
@@ -185,6 +191,7 @@ if (!maplibregl) {
     // Load all layers
     const fylkeIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     (async () => {
+      await initializeExclusionZones(map);
       await AddShelterLayerGeospatial(map, fylkeIds);
       AddDSBWmsLayers(map);
       AddVannOgVassdragLayers(map);
