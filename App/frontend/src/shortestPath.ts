@@ -5,14 +5,15 @@ import { getExclusionZones } from "./exclusion.js";
 
 const API_TIMEOUT_MS = 10000;
 const ROUTE_CACHE = new Map<string, any>();
-const REQUEST_DELAY_MS = 50;
+const REQUEST_DELAY_MS = 100;
+const NUM_ROUTES_TO_FETCH = 10;
 
 
 async function delayForRateLimit(): Promise<void> {
   await new Promise(resolve => setTimeout(resolve, REQUEST_DELAY_MS));
 }
 
-async function findNearestShelters(lat: number, lng: number, k: number = 5): Promise<any[]> {
+async function findNearestShelters(lat: number, lng: number, k: number = NUM_ROUTES_TO_FETCH): Promise<any[]> {
   try {
     const response = await fetch(`/api/nearest-shelters?lat=${lat}&lng=${lng}&k=${k}`);
     return response.ok ? (await response.json()).features || [] : [];
@@ -100,7 +101,7 @@ function decodePolyline6(encoded: string): [number, number][] {
 export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, lng: number): Promise<void> {
   try {
 
-    const shelters = await findNearestShelters(lat, lng, 5);
+    const shelters = await findNearestShelters(lat, lng, NUM_ROUTES_TO_FETCH);
     if (!shelters.length) return;
 
     // Fetch routes sequentially so we don't get rate limited
