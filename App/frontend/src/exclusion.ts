@@ -1,5 +1,6 @@
 import type * as MaplibreGL from "maplibre-gl";
 import { AddExclusionZonesLayer } from "./layer.js";
+import {calculateBoundsForPolygon} from "./utils.js";
 
 let exclusionZonesGeojson: GeoJSON.FeatureCollection = {
   type: "FeatureCollection",
@@ -29,21 +30,6 @@ export type ExclusionZoneBounds = [number, number, number, number, number, numbe
 
 let exclusionZones: ExclusionZoneBounds[] = [];
 
-function calculateBoundsForPolygon(coords: number[][][]): [number, number, number, number] {
-  let minLng = Infinity, maxLng = -Infinity, minLat = Infinity, maxLat = -Infinity;
-
-  for (const ring of coords) {
-    for (const [lng, lat] of ring) {
-      minLng = Math.min(minLng, lng);
-      maxLng = Math.max(maxLng, lng);
-      minLat = Math.min(minLat, lat);
-      maxLat = Math.max(maxLat, lat);
-    }
-  }
-
-  return [minLng, minLat, maxLng, maxLat];
-}
-
 export async function initializeExclusionZones(map: MaplibreGL.Map): Promise<void> {
   try {
     await fetchExclusionZones();
@@ -72,4 +58,3 @@ export async function initializeExclusionZones(map: MaplibreGL.Map): Promise<voi
 export function getExclusionZones(): ExclusionZoneBounds[] {
   return exclusionZones;
 }
-
