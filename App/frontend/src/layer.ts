@@ -329,16 +329,78 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
   const sourceId = 'exclusion-zones-source';
   const layerId = 'exclusion-zones-layer';
   const outlineLayerId = `${layerId}-line`;
+  const labelSourceId = 'exclusion-zones-labels-source';
+  const labelLayerId = 'exclusion-zones-labels-layer';
 
   // Remove existing layers and source if they exist
+  if (map.getLayer(labelLayerId)) map.removeLayer(labelLayerId);
   if (map.getLayer(outlineLayerId)) map.removeLayer(outlineLayerId);
   if (map.getLayer(layerId)) map.removeLayer(layerId);
+  if (map.getSource(labelSourceId)) map.removeSource(labelSourceId);
   if (map.getSource(sourceId)) map.removeSource(sourceId);
+
+  enum ExclusionZoneType {
+  'Flood Zone' = 1,
+  'Radiation Hazard' = 2,
+  'Biological Hazard' = 3,
+  'Toxic Hazard' = 4,
+  'Fire' = 5,
+  'Ruins' = 6,
+  'Active Warzone' = 7,
+  'Low Air Quality' = 8
+}
+
 
   // Add source with all exclusion zones
   map.addSource(sourceId, {
     type: 'geojson',
     data: geojsonData
+  });
+
+  // Create point features at the center of each polygon for labeling
+  const labelPoints: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: geojsonData.features.map((feature) => {
+      // Calculate the visual center (pole of inaccessibility) of the polygon
+      const coords = (feature.geometry as GeoJSON.Polygon).coordinates[0];
+
+      // Simple approach: find the centroid that is inside the polygon
+      // For rectangular exclusion zones, this should work well
+      const bounds = {
+        minLng: Infinity,
+        maxLng: -Infinity,
+        minLat: Infinity,
+        maxLat: -Infinity
+      };
+
+      for (const [lng, lat] of coords) {
+        bounds.minLng = Math.min(bounds.minLng, lng);
+        bounds.maxLng = Math.max(bounds.maxLng, lng);
+        bounds.minLat = Math.min(bounds.minLat, lat);
+        bounds.maxLat = Math.max(bounds.maxLat, lat);
+      }
+
+      // Center of bounding box (works well for rectangular polygons)
+      const centroidLng = (bounds.minLng + bounds.maxLng) / 2;
+      const centroidLat = (bounds.minLat + bounds.maxLat) / 2;
+
+      return {
+        type: 'Feature' as const,
+        properties: {
+          type: feature.properties?.type || 'Unknown'
+        },
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [centroidLng, centroidLat]
+        }
+      };
+    })
+  };
+
+  // Add source for label points
+  map.addSource(labelSourceId, {
+    type: 'geojson',
+    data: labelPoints
   });
 
   // Add fill layer
@@ -364,14 +426,53 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     }
   });
 
-  // Register only the fill layer, and sync outline visibility with it
+  // Add text label layer using the point features (no tiling issues with points)
+  // Build match expression from enum
+  const typeMapping: any[] = ['match', ['get', 'type']];
+  for (const [key, value] of Object.entries(ExclusionZoneType)) {
+    if (!isNaN(Number(key))) continue; // Skip numeric keys
+    typeMapping.push(Number(ExclusionZoneType[key as keyof typeof ExclusionZoneType]));
+    typeMapping.push(key);
+  }
+  typeMapping.push('Unknown'); // Default value
+
+  map.addLayer({
+    id: labelLayerId,
+    type: 'symbol',
+    source: labelSourceId,
+    minzoom: 6,
+    layout: {
+      'text-field': ['format', 'Exclusion Zone\n', {}, typeMapping as any, {}] as any,
+      'text-size': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        5, 10,
+        15, 14
+      ],
+      'text-anchor': 'center',
+      'text-justify': 'center',
+      'text-line-height': 1.2,
+      'text-allow-overlap': false,
+      'text-ignore-placement': false
+    },
+    paint: {
+      'text-color': '#ffffff',
+      'text-halo-color': '#ff0000',
+      'text-halo-width': 1.5,
+      'text-halo-blur': 0
+    }
+  });
+
+  // Register only the fill layer, and sync outline and label visibility with it
   registerLayer(layerId, 'Exclusion Zones', true, map);
 
-  // Sync the outline layer visibility with the fill layer
+  // Sync the outline and label layer visibility with the fill layer
   const originalSetLayoutProperty = map.setLayoutProperty.bind(map);
   const syncVisibility = (layerIdToSync: string, visibility: string) => {
     if (layerIdToSync === layerId) {
       originalSetLayoutProperty(outlineLayerId, 'visibility', visibility);
+      originalSetLayoutProperty(labelLayerId, 'visibility', visibility);
     }
   };
 
@@ -385,5 +486,3 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     return this;
   };
 }
-
-
