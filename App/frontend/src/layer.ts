@@ -3,7 +3,9 @@ import {
   layerCheckboxes,
   registerLayer,
 } from './layerControl.js';
-import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId, MapBounds } from './interfaces.js';
+import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId } from './interfaces.js';
+import { calculateBounds, buildEnumMapping } from './utils.js';
+import { ExclusionZoneType } from './enum.js'
 
 const maplibregl = window.maplibregl;
 
@@ -215,21 +217,6 @@ export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: n
   }
 }
 
-function calculateBounds(coordinates: [number, number][]): { minLng: number; maxLng: number; minLat: number; maxLat: number } {
-  let minLng = coordinates[0][0];
-  let maxLng = coordinates[0][0];
-  let minLat = coordinates[0][1];
-  let maxLat = coordinates[0][1];
-
-  for (const [lng, lat] of coordinates) {
-    minLng = Math.min(minLng, lng);
-    maxLng = Math.max(maxLng, lng);
-    minLat = Math.min(minLat, lat);
-    maxLat = Math.max(maxLat, lat);
-  }
-
-  return { minLng, maxLng, minLat, maxLat };
-}
 
 /**
  * Adds the shortest path layer to the map with a green line. Removes any existing shortest path layer/source first.
@@ -239,7 +226,6 @@ function calculateBounds(coordinates: [number, number][]): { minLng: number; max
  * @param destinationShelterFylkeId The fylke ID where the shelter is located (optional)
  * @param shelterFeature The shelter feature to display popup for (optional)
  */
-
 export function AddShortestPathLayer(
   map: MaplibreGL.Map,
   coordinates: [number, number][],
@@ -339,17 +325,6 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
   if (map.getSource(labelSourceId)) map.removeSource(labelSourceId);
   if (map.getSource(sourceId)) map.removeSource(sourceId);
 
-  enum ExclusionZoneType {
-  'Flood Zone' = 1,
-  'Radiation Hazard' = 2,
-  'Biological Hazard' = 3,
-  'Toxic Hazard' = 4,
-  'Fire' = 5,
-  'Ruins' = 6,
-  'Active Warzone' = 7,
-  'Low Air Quality' = 8
-}
-
 
   // Add source with all exclusion zones
   map.addSource(sourceId, {
@@ -427,14 +402,7 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
   });
 
   // Add text label layer using the point features (no tiling issues with points)
-  // Build match expression from enum
-  const typeMapping: any[] = ['match', ['get', 'type']];
-  for (const [key, value] of Object.entries(ExclusionZoneType)) {
-    if (!isNaN(Number(key))) continue; // Skip numeric keys
-    typeMapping.push(Number(ExclusionZoneType[key as keyof typeof ExclusionZoneType]));
-    typeMapping.push(key);
-  }
-  typeMapping.push('Unknown'); // Default value
+  const typeMapping = buildEnumMapping(ExclusionZoneType);
 
   map.addLayer({
     id: labelLayerId,
