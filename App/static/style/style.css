@@ -4,7 +4,6 @@ html, body, * {
   font-family: 'Space Mono', monospace;
 }
 
-
 html, body {
     margin: 0;
     padding: 0;
@@ -262,8 +261,6 @@ html, body {
     font-size: 0.9rem !important;
     margin: 0.25rem 0.25rem 0.25rem 0 !important;
 }
-
-
 
 .space-mono-bold {
   font-family: "Space Mono", monospace;

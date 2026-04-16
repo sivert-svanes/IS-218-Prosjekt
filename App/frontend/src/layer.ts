@@ -400,10 +400,9 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     paint: {
       'line-color': colorMapping as any,
       'line-width': 2,
-      'line-opacity': 0.8
+      'line-opacity': 0.5
     }
   });
-
 
   map.addLayer({
     id: labelLayerId,
@@ -416,10 +415,11 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
         'interpolate',
         ['linear'],
         ['zoom'],
-        5, 10,
-        15, 14
+        8, 13,
+        16, 15
       ],
       'text-anchor': 'center',
+      'text-font': ['Space Mono Bold'],
       'text-justify': 'center',
       'text-line-height': 1.2,
       'text-allow-overlap': false,
@@ -428,8 +428,8 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     paint: {
       'text-color': '#ffffff',
       'text-halo-color': colorMapping as any,
-      'text-halo-width': 1.5,
-      'text-halo-blur': 0
+      'text-halo-width': 1.0,
+      'text-halo-blur': 0.0
     }
   });
 
