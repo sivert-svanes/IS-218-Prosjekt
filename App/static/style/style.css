@@ -1,4 +1,11 @@
-﻿html, body {
+﻿@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap');
+
+html, body, * {
+  font-family: 'Space Mono', monospace;
+}
+
+
+html, body {
     margin: 0;
     padding: 0;
     width: 100%;
@@ -32,7 +39,6 @@
 }
 
 .header {
-    font-family: 'Courier New', 'Monaco', 'Consolas', monospace;
     font-size: 1.5rem; /* ~28px */
     font-weight: 500;
     line-height: 1.2;
@@ -40,7 +46,6 @@
 }
 
 .text {
-    font-family: 'Courier New', 'Monaco', 'Consolas', monospace;
     font-size: 1.0rem;
     line-height: 1.2;
     color: #c2c8ca;
@@ -55,7 +60,6 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-family: 'Courier New', 'Monaco', 'Consolas', monospace;
 }
 
 .button{
@@ -123,7 +127,6 @@
     pointer-events: none;
 }
 
-
 .dropdown-menu.open {
     visibility: visible;
     opacity: 1;
@@ -135,7 +138,6 @@
     align-items: center;
     gap: 0.5rem;
     padding: 0.4rem 0.65rem;
-    font-family: 'Courier New', 'Monaco', 'Consolas', monospace;
     font-size: 0.85rem;
     color: #c2c8ca;
     cursor: pointer;
@@ -157,7 +159,6 @@
 
 .dropdown-empty {
     padding: 0.5rem 0.65rem;
-    font-family: 'Courier New', 'Monaco', 'Consolas', monospace;
     font-size: 0.8rem;
     color: rgba(194, 200, 202, 0.5);
     font-style: italic;
@@ -262,3 +263,22 @@
     margin: 0.25rem 0.25rem 0.25rem 0 !important;
 }
 
+
+
+.space-mono-bold {
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-style: normal;
+}
+
+.space-mono-regular-italic {
+  font-family: "Space Mono", monospace;
+  font-weight: 400;
+  font-style: italic;
+}
+
+.space-mono-bold-italic {
+  font-family: "Space Mono", monospace;
+  font-weight: 700;
+  font-style: italic;
+}
