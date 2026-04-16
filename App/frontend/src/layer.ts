@@ -4,8 +4,8 @@ import {
   registerLayer,
 } from './layerControl.js';
 import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId } from './interfaces.js';
-import { calculateBounds, buildEnumMapping } from './utils.js';
-import { ExclusionZoneType } from './enum.js'
+import { calculateBounds, buildEnumMapping, buildColorMapping } from './utils.js';
+import { ExclusionZoneType, exclusionZoneColor } from './enum.js'
 
 const maplibregl = window.maplibregl;
 
@@ -372,6 +372,9 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     })
   };
 
+  const typeMapping = buildEnumMapping(ExclusionZoneType);
+  const colorMapping = buildColorMapping(ExclusionZoneType, exclusionZoneColor);
+
   // Add source for label points
   map.addSource(labelSourceId, {
     type: 'geojson',
@@ -382,9 +385,9 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
   map.addLayer({
     id: layerId,
     type: 'fill',
-    source: sourceId,
+    source: sourceId as any,
     paint: {
-      'fill-color': '#ff0000',
+      'fill-color': colorMapping as any,
       'fill-opacity': 0.3
     }
   });
@@ -395,19 +398,17 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     type: 'line',
     source: sourceId,
     paint: {
-      'line-color': '#ff0000',
+      'line-color': colorMapping as any,
       'line-width': 2,
       'line-opacity': 0.8
     }
   });
 
-  // Add text label layer using the point features (no tiling issues with points)
-  const typeMapping = buildEnumMapping(ExclusionZoneType);
 
   map.addLayer({
     id: labelLayerId,
     type: 'symbol',
-    source: labelSourceId,
+    source: labelSourceId as any,
     minzoom: 6,
     layout: {
       'text-field': ['format', 'Exclusion Zone\n', {}, typeMapping as any, {}] as any,
@@ -426,7 +427,7 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     },
     paint: {
       'text-color': '#ffffff',
-      'text-halo-color': '#ff0000',
+      'text-halo-color': colorMapping as any,
       'text-halo-width': 1.5,
       'text-halo-blur': 0
     }
