@@ -206,6 +206,152 @@ export function addWavyPattern(
 }
 
 /**
+ * Adds a cross (X) pattern to the map
+ * @param map The MapLibre map instance
+ * @param patternName The name/id for the pattern (default: 'cross-pattern')
+ * @param options Configuration options for the pattern
+ */
+export function addCrossPattern(
+  map: MaplibreGL.Map,
+  patternName: string = 'cross-pattern',
+  options: {
+    width?: number;
+    height?: number;
+    lineWidth?: number;
+    lineColor?: string;
+    lineOpacity?: number;
+    backgroundColor?: string;
+    backgroundOpacity?: number;
+    pixelRatio?: number;
+  } = {}
+): void {
+  const {
+    width = DEFAULT_PATTERN_OPTIONS.width,
+    height = DEFAULT_PATTERN_OPTIONS.height,
+    lineWidth = DEFAULT_PATTERN_OPTIONS.lineWidth,
+    lineColor = DEFAULT_PATTERN_OPTIONS.lineColor,
+    lineOpacity = DEFAULT_PATTERN_OPTIONS.lineOpacity,
+    backgroundColor = DEFAULT_PATTERN_OPTIONS.backgroundColor,
+    backgroundOpacity = DEFAULT_PATTERN_OPTIONS.backgroundOpacity,
+    pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
+  } = options;
+
+  const canvas = document.createElement('canvas');
+  // Render at higher resolution for anti-aliasing
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const ctx = canvas.getContext('2d')!;
+
+  // Scale context for higher DPI rendering
+  ctx.scale(pixelRatio, pixelRatio);
+
+  // Draw background
+  drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+
+  // Draw cross (X) pattern with opacity
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = lineWidth;
+  ctx.globalAlpha = lineOpacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Draw X pattern (two diagonal lines)
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(width, height);
+  ctx.moveTo(width, 0);
+  ctx.lineTo(0, height);
+  ctx.stroke();
+
+  ctx.globalAlpha = 1; // Reset alpha
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+}
+
+/**
+ * Adds an angled lines pattern to the map (vertical lines tilted 30 degrees to the right)
+ * @param map The MapLibre map instance
+ * @param patternName The name/id for the pattern (default: 'angled-lines-pattern')
+ * @param options Configuration options for the pattern
+ */
+export function addAngledLinesPattern(
+  map: MaplibreGL.Map,
+  patternName: string = 'angled-lines-pattern',
+  options: {
+    width?: number;
+    height?: number;
+    lineWidth?: number;
+    lineColor?: string;
+    lineOpacity?: number;
+    backgroundColor?: string;
+    backgroundOpacity?: number;
+    spacing?: number;
+    pixelRatio?: number;
+  } = {}
+): void {
+  const {
+    width = 40,
+    height = 40,
+    lineWidth = DEFAULT_PATTERN_OPTIONS.lineWidth,
+    lineColor = DEFAULT_PATTERN_OPTIONS.lineColor,
+    lineOpacity = DEFAULT_PATTERN_OPTIONS.lineOpacity,
+    backgroundColor = DEFAULT_PATTERN_OPTIONS.backgroundColor,
+    backgroundOpacity = DEFAULT_PATTERN_OPTIONS.backgroundOpacity,
+    spacing = 8,
+    pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
+  } = options;
+
+  const canvas = document.createElement('canvas');
+  // Render at higher resolution for anti-aliasing
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const ctx = canvas.getContext('2d')!;
+
+  // Scale context for higher DPI rendering
+  ctx.scale(pixelRatio, pixelRatio);
+
+  // Draw background
+  drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+
+  // Draw angled lines pattern with opacity
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = lineWidth;
+  ctx.globalAlpha = lineOpacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Draw vertical lines tilted 30 degrees to the right
+  const angle = (31 * Math.PI) / 180;
+  const lineSpacing = spacing;
+  const horizontalShift = height * Math.tan(angle);
+
+  // Draw lines that completely fill the tile and wrap seamlessly
+  ctx.beginPath();
+
+  // Start from far left to ensure complete coverage
+  // Lines need to fill from left edge to right edge as they go from top to bottom
+  const startOffset = -Math.ceil(horizontalShift);
+  const endOffset = width + Math.ceil(horizontalShift);
+
+  for (let x = startOffset; x < endOffset; x += lineSpacing) {
+    const startX = x;
+    const startY = 0;
+    const endX = x - horizontalShift;
+    const endY = height;
+
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+  }
+  ctx.stroke();
+
+  ctx.globalAlpha = 1; // Reset alpha
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+}
+
+/**
  * Builds a pattern mapping for exclusion zones with support for different pattern types per zone
  * @param map The MapLibre map instance
  * @param zoneTypeEnum The exclusion zone type enum
@@ -233,6 +379,10 @@ export function buildPatternMapping(
       addWavyPattern(map, patternName, { backgroundColor: color, lineColor: color });
     } else if (patternType === PatternType.Sawtooth) {
       addSawtoothPattern(map, patternName, { backgroundColor: color, lineColor: color });
+    } else if (patternType === PatternType.Cross) {
+      addCrossPattern(map, patternName, { backgroundColor: color, lineColor: color });
+    } else if (patternType === PatternType.AngledLines) {
+      addAngledLinesPattern(map, patternName, { backgroundColor: color, lineColor: color });
     } else {
       addSolidPattern(map, patternName, { backgroundColor: color });
     }

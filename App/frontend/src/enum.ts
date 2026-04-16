@@ -24,17 +24,19 @@ export enum exclusionZoneColor {
 export enum PatternType {
   Solid   = 'solid',
   Sawtooth = 'sawtooth',
-  Wavy    = 'wavy'
+  Wavy    = 'wavy',
+  Cross   = 'cross',
+  AngledLines = 'angled-lines'
 }
 
 export enum exclusionZonePattern {
   'Flood Zone'        = PatternType.Wavy,
   'Radiation Hazard'  = PatternType.Solid,
-  'Biological Hazard' = PatternType.Solid,
+  'Biological Hazard' = PatternType.AngledLines,
   'Toxic Hazard'      = PatternType.Solid,
-  'Fire'              = PatternType.Solid,
-  'Ruins'             = PatternType.Solid,
-  'Active Warzone'    = PatternType.Sawtooth,
+  'Fire'              = PatternType.Sawtooth,
+  'Ruins'             = PatternType.Cross,
+  'Active Warzone'    = PatternType.AngledLines,
   'Low Air Quality'   = PatternType.Solid
 }
 //endregion
