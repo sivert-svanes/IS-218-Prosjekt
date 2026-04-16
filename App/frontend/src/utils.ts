@@ -49,3 +49,31 @@ export function buildEnumMapping(enumType: any, defaultValue: string = 'Unknown'
   mapping.push(defaultValue);
   return mapping;
 }
+
+export function decodePolyline6(encoded: string): [number, number][] {
+  const coords: [number, number][] = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+
+  const decodeValue = () => {
+    let result = 0;
+    let shift = 0;
+    let byte: number;
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+      if (byte < 0x20) break;
+    } while (true);
+    return result & 1 ? ~(result >> 1) : result >> 1;
+  };
+
+  while (index < encoded.length) {
+    lat += decodeValue();
+    lng += decodeValue();
+    coords.push([lng / 1e6, lat / 1e6]);
+  }
+
+  return coords;
+}

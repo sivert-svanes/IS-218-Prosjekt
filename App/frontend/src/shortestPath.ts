@@ -2,6 +2,7 @@
 import { AddShortestPathLayer, ClearShortestPathLayer } from "./layer.js";
 import type { ShelterFeature } from "./interfaces.js";
 import { getExclusionZones } from "./exclusion.js";
+import { decodePolyline6 } from "./utils.js";
 
 const API_TIMEOUT_MS = 20000;
 const ROUTE_CACHE = new Map<string, any>();
@@ -146,33 +147,6 @@ async function getRoute(userLng: number, userLat: number, trgLng: number, trgLat
   return null;
 }
 
-function decodePolyline6(encoded: string): [number, number][] {
-  const coords: [number, number][] = [];
-  let index = 0;
-  let lat = 0;
-  let lng = 0;
-
-  const decodeValue = () => {
-    let result = 0;
-    let shift = 0;
-    let byte: number;
-    do {
-      byte = encoded.charCodeAt(index++) - 63;
-      result |= (byte & 0x1f) << shift;
-      shift += 5;
-      if (byte < 0x20) break;
-    } while (true);
-    return result & 1 ? ~(result >> 1) : result >> 1;
-  };
-
-  while (index < encoded.length) {
-    lat += decodeValue();
-    lng += decodeValue();
-    coords.push([lng / 1e6, lat / 1e6]);
-  }
-
-  return coords;
-}
 
 export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, lng: number): Promise<void> {
   try {
