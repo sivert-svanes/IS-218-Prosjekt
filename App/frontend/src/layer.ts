@@ -4,8 +4,9 @@ import {
   registerLayer,
 } from './layerControl.js';
 import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId } from './interfaces.js';
-import { calculateBounds, buildEnumMapping, buildColorMapping } from './utils.js';
-import { ExclusionZoneType, exclusionZoneColor } from './enum.js'
+import { calculateBounds, buildEnumMapping, buildColorMapping, buildPatternConfig } from './utils.js';
+import { ExclusionZoneType, exclusionZoneColor, exclusionZonePattern } from './enum.js';
+import { buildPatternMapping } from './patterns.js';
 
 const maplibregl = window.maplibregl;
 
@@ -306,11 +307,6 @@ export function ClearShortestPathLayer(map: MaplibreGL.Map): void {
   if (btn) btn.style.display = 'none';
 }
 
-/**
- * Adds exclusion zones layer to the map and registers it with layer control.
- * @param map The MapLibre map instance
- * @param geojsonData The GeoJSON FeatureCollection with exclusion zones
- */
 export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON.FeatureCollection): void {
   const sourceId = 'exclusion-zones-source';
   const layerId = 'exclusion-zones-layer';
@@ -375,6 +371,11 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
   const typeMapping = buildEnumMapping(ExclusionZoneType);
   const colorMapping = buildColorMapping(ExclusionZoneType, exclusionZoneColor);
 
+  // Build pattern configuration from enum
+  const patternConfig = buildPatternConfig(exclusionZonePattern);
+
+  const patternMapping = buildPatternMapping(map, ExclusionZoneType, exclusionZoneColor, patternConfig);
+
   // Add source for label points
   map.addSource(labelSourceId, {
     type: 'geojson',
@@ -387,8 +388,7 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     type: 'fill',
     source: sourceId as any,
     paint: {
-      'fill-color': colorMapping as any,
-      'fill-opacity': 0.3
+      'fill-pattern': patternMapping as any,
     }
   });
 
@@ -400,7 +400,8 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     paint: {
       'line-color': colorMapping as any,
       'line-width': 2,
-      'line-opacity': 0.5
+      'line-opacity': 0.6,
+      'line-dasharray': [2, 2]
     }
   });
 

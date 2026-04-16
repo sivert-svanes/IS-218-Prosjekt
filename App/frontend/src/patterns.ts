@@ -1,0 +1,246 @@
+﻿import type * as MaplibreGL from "maplibre-gl";
+import { PatternType } from './enum.js';
+
+// Default pattern options
+const DEFAULT_PATTERN_OPTIONS = {
+  width: 10,
+  height: 10,
+  lineWidth: 2,
+  lineColor: '#000000',
+  lineOpacity: 0.1,
+  backgroundColor: 'transparent',
+  backgroundOpacity: 0.3,
+  pixelRatio: 2,
+};
+
+/**
+ * Draws a background on a canvas context
+ * @param ctx The 2D canvas context
+ * @param width The width of the canvas
+ * @param height The height of the canvas
+ * @param backgroundColor The background color ('transparent' for no background)
+ * @param backgroundOpacity The opacity of the background (0-1)
+ */
+function drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, backgroundColor: string, backgroundOpacity: number = 1): void {
+  if (backgroundColor !== 'transparent') {
+    ctx.fillStyle = backgroundColor;
+    ctx.globalAlpha = backgroundOpacity;
+    ctx.fillRect(0, 0, width, height);
+    ctx.globalAlpha = 1; // Reset alpha
+  }
+}
+
+/**
+ * Adds a solid color pattern to the map (background only, no pattern lines)
+ * @param map The MapLibre map instance
+ * @param patternName The name/id for the pattern (default: 'solid-pattern')
+ * @param options Configuration options for the pattern
+ */
+export function addSolidPattern(
+  map: MaplibreGL.Map,
+  patternName: string = 'solid-pattern',
+  options: {
+    width?: number;
+    height?: number;
+    backgroundColor?: string;
+    backgroundOpacity?: number;
+    pixelRatio?: number;
+  } = {}
+): void {
+  const {
+    width = DEFAULT_PATTERN_OPTIONS.width,
+    height = DEFAULT_PATTERN_OPTIONS.height,
+    backgroundColor = DEFAULT_PATTERN_OPTIONS.backgroundColor,
+    backgroundOpacity = DEFAULT_PATTERN_OPTIONS.backgroundOpacity,
+    pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
+  } = options;
+
+  const canvas = document.createElement('canvas');
+  // Render at higher resolution for anti-aliasing
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const ctx = canvas.getContext('2d')!;
+
+  // Scale context for higher DPI rendering
+  ctx.scale(pixelRatio, pixelRatio);
+
+  // Draw background only (no pattern lines)
+  drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+}
+
+/**
+ * Adds a chevron pattern to the map
+ * @param map The MapLibre map instance
+ * @param patternName The name/id for the pattern (default: 'chevron-pattern')
+ * @param options Configuration options for the pattern
+ */
+export function addSawtoothPattern(
+  map: MaplibreGL.Map,
+  patternName: string = 'chevron-pattern',
+  options: {
+    width?: number;
+    height?: number;
+    lineWidth?: number;
+    lineColor?: string;
+    lineOpacity?: number;
+    backgroundColor?: string;
+    backgroundOpacity?: number;
+    pixelRatio?: number;
+  } = {}
+): void {
+  const {
+    width = DEFAULT_PATTERN_OPTIONS.width,
+    height = DEFAULT_PATTERN_OPTIONS.height,
+    lineWidth = DEFAULT_PATTERN_OPTIONS.lineWidth,
+    lineColor = DEFAULT_PATTERN_OPTIONS.lineColor,
+    lineOpacity = DEFAULT_PATTERN_OPTIONS.lineOpacity,
+    backgroundColor = DEFAULT_PATTERN_OPTIONS.backgroundColor,
+    backgroundOpacity = DEFAULT_PATTERN_OPTIONS.backgroundOpacity,
+    pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
+  } = options;
+
+  const canvas = document.createElement('canvas');
+  // Render at higher resolution for anti-aliasing
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const ctx = canvas.getContext('2d')!;
+
+  // Scale context for higher DPI rendering
+  ctx.scale(pixelRatio, pixelRatio);
+
+  // Draw background
+  drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+
+  // Draw chevron pattern with opacity
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = lineWidth;
+  ctx.globalAlpha = lineOpacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Draw diagonal lines for chevron effect
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(width / 2, height / 2);
+  ctx.moveTo(width / 2, height / 2);
+  ctx.lineTo(width, 0);
+  ctx.stroke();
+
+  ctx.globalAlpha = 1; // Reset alpha
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+}
+
+/**
+ * Adds a wavy pattern to the map
+ * @param map The MapLibre map instance
+ * @param patternName The name/id for the pattern (default: 'wavy-pattern')
+ * @param options Configuration options for the pattern
+ */
+export function addWavyPattern(
+  map: MaplibreGL.Map,
+  patternName: string = 'wavy-pattern',
+  options: {
+    width?: number;
+    height?: number;
+    lineWidth?: number;
+    lineColor?: string;
+    lineOpacity?: number;
+    backgroundColor?: string;
+    backgroundOpacity?: number;
+    amplitude?: number;
+    frequency?: number;
+    pixelRatio?: number;
+  } = {}
+): void {
+  const {
+    width = DEFAULT_PATTERN_OPTIONS.width,
+    height = DEFAULT_PATTERN_OPTIONS.height,
+    lineWidth = DEFAULT_PATTERN_OPTIONS.lineWidth,
+    lineColor = DEFAULT_PATTERN_OPTIONS.lineColor,
+    lineOpacity = DEFAULT_PATTERN_OPTIONS.lineOpacity,
+    backgroundColor = DEFAULT_PATTERN_OPTIONS.backgroundColor,
+    backgroundOpacity = DEFAULT_PATTERN_OPTIONS.backgroundOpacity,
+    amplitude = height / 3,
+    frequency = 0.5,
+    pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
+  } = options;
+
+  const canvas = document.createElement('canvas');
+  // Render at higher resolution for anti-aliasing
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const ctx = canvas.getContext('2d')!;
+
+  // Scale context for higher DPI rendering
+  ctx.scale(pixelRatio, pixelRatio);
+
+  // Draw background
+  drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+
+  // Draw wavy pattern with opacity
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = lineWidth;
+  ctx.globalAlpha = lineOpacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Draw horizontal wavy lines
+  ctx.beginPath();
+  const centerY = height / 2;
+  ctx.moveTo(0, centerY);
+  for (let x = 0; x <= width; x += 0.5) {
+    const y = centerY + Math.sin((x / width) * Math.PI * 2 * frequency) * amplitude;
+    ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  ctx.globalAlpha = 1; // Reset alpha
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+}
+
+/**
+ * Builds a pattern mapping for exclusion zones with support for different pattern types per zone
+ * @param map The MapLibre map instance
+ * @param zoneTypeEnum The exclusion zone type enum
+ * @param colorEnum The color enum for each zone type
+ * @param patternConfig Configuration for which pattern type each zone should use
+ */
+export function buildPatternMapping(
+  map: MaplibreGL.Map,
+  zoneTypeEnum: any,
+  colorEnum: any,
+  patternConfig: { [key: string]: string } = {}
+): any[] {
+  const patternMapping: any[] = ['match', ['get', 'type']];
+
+  for (const [key, value] of Object.entries(zoneTypeEnum)) {
+    if (!isNaN(Number(key))) continue; // Skip numeric keys
+
+    const numericValue = Number(value);
+    const color = (colorEnum as any)[key] || '#cccccc';
+    const patternType = patternConfig[key] || PatternType.Solid; // Default to solid
+    const patternName = `${patternType}-pattern-${numericValue}`;
+
+    // Add the pattern to the map based on type
+    if (patternType === PatternType.Wavy) {
+      addWavyPattern(map, patternName, { backgroundColor: color, lineColor: color });
+    } else if (patternType === PatternType.Sawtooth) {
+      addSawtoothPattern(map, patternName, { backgroundColor: color, lineColor: color });
+    } else {
+      addSolidPattern(map, patternName, { backgroundColor: color });
+    }
+
+    patternMapping.push(numericValue);
+    patternMapping.push(patternName);
+  }
+
+  patternMapping.push('solid-pattern-1'); // Default pattern
+  return patternMapping;
+}

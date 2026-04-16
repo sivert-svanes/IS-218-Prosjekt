@@ -100,3 +100,20 @@ export function decodePolyline6(encoded: string): [number, number][] {
 
   return coords;
 }
+
+/**
+ * Builds a pattern configuration object from a pattern enum.
+ * Maps zone type names to their pattern styles.
+ * @param patternEnum The pattern enum to convert
+ * @returns A pattern configuration object for use in buildPatternMapping
+ */
+export function buildPatternConfig(patternEnum: any): { [key: string]: string } {
+  const config: { [key: string]: string } = {};
+
+  for (const [key, value] of Object.entries(patternEnum)) {
+    if (!isNaN(Number(key))) continue; // Skip numeric keys
+    config[key] = value as string;
+  }
+
+  return config;
+}

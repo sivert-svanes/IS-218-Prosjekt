@@ -9,6 +9,7 @@
   'Low Air Quality'   = 8
 }
 
+//region Config
 export enum exclusionZoneColor {
   'Flood Zone'        = '#0000ff',
   'Radiation Hazard'  = '#ffd500',
@@ -19,3 +20,21 @@ export enum exclusionZoneColor {
   'Active Warzone'    = '#ff0000',
   'Low Air Quality'   = '#757575'
 }
+
+export enum PatternType {
+  Solid   = 'solid',
+  Sawtooth = 'sawtooth',
+  Wavy    = 'wavy'
+}
+
+export enum exclusionZonePattern {
+  'Flood Zone'        = PatternType.Wavy,
+  'Radiation Hazard'  = PatternType.Solid,
+  'Biological Hazard' = PatternType.Solid,
+  'Toxic Hazard'      = PatternType.Solid,
+  'Fire'              = PatternType.Solid,
+  'Ruins'             = PatternType.Solid,
+  'Active Warzone'    = PatternType.Sawtooth,
+  'Low Air Quality'   = PatternType.Solid
+}
+//endregion
