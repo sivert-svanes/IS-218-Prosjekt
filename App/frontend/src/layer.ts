@@ -447,7 +447,6 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
   };
 
   // Override setLayoutProperty to sync visibility
-  const originalMethod = map.setLayoutProperty;
   (map as any).setLayoutProperty = function(layerIdToOverride: string, name: string, value: any) {
     originalSetLayoutProperty(layerIdToOverride, name, value);
     if (name === 'visibility') {
