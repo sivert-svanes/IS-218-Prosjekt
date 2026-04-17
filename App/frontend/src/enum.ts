@@ -12,7 +12,7 @@
 //region Config
 export enum exclusionZoneColor {
   'Flood Zone'        = '#0000ff',
-  'Radiation Hazard'  = '#ffd500',
+  'Radiation Hazard'  = '#e1ca43',
   'Biological Hazard' = '#0f643a',
   'Toxic Hazard'      = '#136000',
   'Fire'              = '#ff6a00',
@@ -27,12 +27,13 @@ export enum PatternType {
   Wavy    = 'wavy',
   Cross   = 'cross',
   AngledLines = 'angled-lines',
-  VerticalWaves = 'vertical-waves'
+  VerticalWaves = 'vertical-waves',
+  GammaWaves = 'gamma-waves'
 }
 
 export enum exclusionZonePattern {
   'Flood Zone'        = PatternType.Wavy,
-  'Radiation Hazard'  = PatternType.Solid,
+  'Radiation Hazard'  = PatternType.GammaWaves,
   'Biological Hazard' = PatternType.Solid,
   'Toxic Hazard'      = PatternType.Solid,
   'Fire'              = PatternType.Sawtooth,

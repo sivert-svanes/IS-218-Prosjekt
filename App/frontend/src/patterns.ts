@@ -435,6 +435,89 @@ export function addVerticalWavesPattern(
 }
 
 /**
+ * Adds a tight gamma wave pattern to the map (represents high-energy gamma radiation)
+ * @param map The MapLibre map instance
+ * @param patternName The name/id for the pattern (default: 'gamma-waves-pattern')
+ * @param options Configuration options for the pattern
+ */
+export function addGammaWavesPattern(
+  map: MaplibreGL.Map,
+  patternName: string = 'gamma-waves-pattern',
+  options: {
+    width?: number;
+    height?: number;
+    lineWidth?: number;
+    lineColor?: string;
+    lineOpacity?: number;
+    backgroundColor?: string;
+    backgroundOpacity?: number;
+    amplitude?: number;
+    frequency?: number;
+    pixelRatio?: number;
+  } = {}
+): void {
+  const {
+    width = 60,
+    height = 60,
+    lineWidth = DEFAULT_PATTERN_OPTIONS.lineWidth,
+    lineColor = DEFAULT_PATTERN_OPTIONS.lineColor,
+    lineOpacity = DEFAULT_PATTERN_OPTIONS.lineOpacity,
+    backgroundColor = DEFAULT_PATTERN_OPTIONS.backgroundColor,
+    backgroundOpacity = DEFAULT_PATTERN_OPTIONS.backgroundOpacity,
+    amplitude = height / 6,
+    frequency = 8,
+    pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
+  } = options;
+
+  const canvas = document.createElement('canvas');
+  // Render at higher resolution for anti-aliasing
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const ctx = canvas.getContext('2d')!;
+
+  // Scale context for higher DPI rendering
+  ctx.scale(pixelRatio, pixelRatio);
+
+  // Draw background
+  drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+
+  // Draw tight gamma wave pattern with opacity
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = lineWidth;
+  ctx.globalAlpha = lineOpacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Draw tight horizontal wavy lines with high frequency for gamma waves
+  ctx.beginPath();
+  const centerY = height / 2;
+  ctx.moveTo(0, centerY);
+  for (let x = 0; x <= width; x += 0.25) {
+    const y = centerY + Math.sin((x / width) * Math.PI * 2 * frequency) * amplitude;
+    ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Draw additional waves above and below for density
+  for (let offset = -height / 3; offset <= height / 3; offset += height / 3) {
+    if (offset === 0) continue; // Skip the center line already drawn
+    ctx.beginPath();
+    const waveY = centerY + offset;
+    ctx.moveTo(0, waveY);
+    for (let x = 0; x <= width; x += 0.25) {
+      const y = waveY + Math.sin((x / width) * Math.PI * 2 * frequency) * amplitude;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = 1; // Reset alpha
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+}
+
+/**
  * Builds a pattern mapping for exclusion zones with support for different pattern types per zone
  * @param map The MapLibre map instance
  * @param zoneTypeEnum The exclusion zone type enum
@@ -468,6 +551,8 @@ export function buildPatternMapping(
       addAngledLinesPattern(map, patternName, { backgroundColor: color, lineColor: color });
     } else if (patternType === PatternType.VerticalWaves) {
       addVerticalWavesPattern(map, patternName, { backgroundColor: color, lineColor: color });
+    } else if (patternType === PatternType.GammaWaves) {
+      addGammaWavesPattern(map, patternName, { backgroundColor: color, lineColor: color });
     } else {
       addSolidPattern(map, patternName, { backgroundColor: color });
     }
