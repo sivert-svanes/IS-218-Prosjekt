@@ -118,3 +118,77 @@ def get_k_nearest_shelters(engine, lat: float, lng: float, k: int = 10):
         """), {"lat": lat, "lng": lng, "k": k})
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
+
+
+def _parse_wkt_polygon(wkt: str) -> list:
+    """Parse WKT POLYGON string to GeoJSON coordinates."""
+    wkt = wkt.strip()
+    if wkt.startswith('POLYGON'):
+        wkt = wkt[7:].strip()
+    if wkt.startswith('('):
+        wkt = wkt[1:]
+    if wkt.endswith(')'):
+        wkt = wkt[:-1]
+
+    rings = []
+    depth = 0
+    current_ring = ""
+
+    for char in wkt:
+        if char == '(':
+            depth += 1
+            if depth == 1:
+                current_ring = ""
+            else:
+                current_ring += char
+        elif char == ')':
+            depth -= 1
+            if depth == 0:
+                coords_str = current_ring.strip()
+                if coords_str:
+                    coords = []
+                    for point in coords_str.split(','):
+                        parts = point.strip().split()
+                        if len(parts) >= 2:
+                            coords.append([float(parts[0]), float(parts[1])])
+                    rings.append(coords)
+            else:
+                current_ring += char
+        else:
+            if depth > 0:
+                current_ring += char
+
+    return rings if rings else []
+
+
+def get_exclusion_zones(engine):
+    """Get all exclusion zones as a FeatureCollection."""
+    with engine.connect() as conn:
+        query = text("SELECT geom_wkt, type FROM exclusionzone")
+        rows = conn.execute(query).fetchall()
+
+        features = []
+        for row in rows:
+            wkt = row[0]
+            zone_type = row[1]
+
+            try:
+                coordinates = _parse_wkt_polygon(wkt)
+                if coordinates:
+                    feature = {
+                        "type": "Feature",
+                        "properties": {"type": zone_type},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": coordinates
+                        }
+                    }
+                    features.append(feature)
+            except Exception as e:
+                print(f"Error parsing exclusion zone: {e}")
+                continue
+
+        return {
+            "type": "FeatureCollection",
+            "features": features
+        }

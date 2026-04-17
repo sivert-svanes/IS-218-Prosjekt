@@ -3,7 +3,10 @@ import {
   layerCheckboxes,
   registerLayer,
 } from './layerControl.js';
-import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId, MapBounds } from './interfaces.js';
+import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId } from './interfaces.js';
+import { calculateBounds, buildEnumMapping, buildColorMapping, buildPatternConfig } from './utils.js';
+import { ExclusionZoneType, exclusionZoneColor, exclusionZonePattern } from './enum.js';
+import { buildPatternMapping } from './patterns.js';
 
 const maplibregl = window.maplibregl;
 
@@ -215,21 +218,6 @@ export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: n
   }
 }
 
-function calculateBounds(coordinates: [number, number][]): { minLng: number; maxLng: number; minLat: number; maxLat: number } {
-  let minLng = coordinates[0][0];
-  let maxLng = coordinates[0][0];
-  let minLat = coordinates[0][1];
-  let maxLat = coordinates[0][1];
-
-  for (const [lng, lat] of coordinates) {
-    minLng = Math.min(minLng, lng);
-    maxLng = Math.max(maxLng, lng);
-    minLat = Math.min(minLat, lat);
-    maxLat = Math.max(maxLat, lat);
-  }
-
-  return { minLng, maxLng, minLat, maxLat };
-}
 
 /**
  * Adds the shortest path layer to the map with a green line. Removes any existing shortest path layer/source first.
@@ -239,7 +227,6 @@ function calculateBounds(coordinates: [number, number][]): { minLng: number; max
  * @param destinationShelterFylkeId The fylke ID where the shelter is located (optional)
  * @param shelterFeature The shelter feature to display popup for (optional)
  */
-
 export function AddShortestPathLayer(
   map: MaplibreGL.Map,
   coordinates: [number, number][],
@@ -318,4 +305,153 @@ export function ClearShortestPathLayer(map: MaplibreGL.Map): void {
 
   const btn = document.getElementById('clear-path-btn');
   if (btn) btn.style.display = 'none';
+}
+
+export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON.FeatureCollection): void {
+  const sourceId = 'exclusion-zones-source';
+  const layerId = 'exclusion-zones-layer';
+  const outlineLayerId = `${layerId}-line`;
+  const labelSourceId = 'exclusion-zones-labels-source';
+  const labelLayerId = 'exclusion-zones-labels-layer';
+
+  // Remove existing layers and source if they exist
+  if (map.getLayer(labelLayerId)) map.removeLayer(labelLayerId);
+  if (map.getLayer(outlineLayerId)) map.removeLayer(outlineLayerId);
+  if (map.getLayer(layerId)) map.removeLayer(layerId);
+  if (map.getSource(labelSourceId)) map.removeSource(labelSourceId);
+  if (map.getSource(sourceId)) map.removeSource(sourceId);
+
+
+  // Add source with all exclusion zones
+  map.addSource(sourceId, {
+    type: 'geojson',
+    data: geojsonData
+  });
+
+  // Create point features at the center of each polygon for labeling
+  const labelPoints: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: geojsonData.features.map((feature) => {
+      // Calculate the visual center (pole of inaccessibility) of the polygon
+      const coords = (feature.geometry as GeoJSON.Polygon).coordinates[0];
+
+      // Simple approach: find the centroid that is inside the polygon
+      // For rectangular exclusion zones, this should work well
+      const bounds = {
+        minLng: Infinity,
+        maxLng: -Infinity,
+        minLat: Infinity,
+        maxLat: -Infinity
+      };
+
+      for (const [lng, lat] of coords) {
+        bounds.minLng = Math.min(bounds.minLng, lng);
+        bounds.maxLng = Math.max(bounds.maxLng, lng);
+        bounds.minLat = Math.min(bounds.minLat, lat);
+        bounds.maxLat = Math.max(bounds.maxLat, lat);
+      }
+
+      // Center of bounding box (works well for rectangular polygons)
+      const centroidLng = (bounds.minLng + bounds.maxLng) / 2;
+      const centroidLat = (bounds.minLat + bounds.maxLat) / 2;
+
+      return {
+        type: 'Feature' as const,
+        properties: {
+          type: feature.properties?.type || 'Unknown'
+        },
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [centroidLng, centroidLat]
+        }
+      };
+    })
+  };
+
+  const typeMapping = buildEnumMapping(ExclusionZoneType);
+  const colorMapping = buildColorMapping(ExclusionZoneType, exclusionZoneColor);
+
+  // Build pattern configuration from enum
+  const patternConfig = buildPatternConfig(exclusionZonePattern);
+
+  const patternMapping = buildPatternMapping(map, ExclusionZoneType, exclusionZoneColor, patternConfig);
+
+  // Add source for label points
+  map.addSource(labelSourceId, {
+    type: 'geojson',
+    data: labelPoints
+  });
+
+  // Add fill layer
+  map.addLayer({
+    id: layerId,
+    type: 'fill',
+    source: sourceId as any,
+    paint: {
+      'fill-pattern': patternMapping as any,
+    }
+  });
+
+  // Add line layer on top for visible outline
+  map.addLayer({
+    id: outlineLayerId,
+    type: 'line',
+    source: sourceId,
+    paint: {
+      'line-color': colorMapping as any,
+      'line-width': 2,
+      'line-opacity': 0.6,
+      'line-dasharray': [2, 2]
+    }
+  });
+
+  map.addLayer({
+    id: labelLayerId,
+    type: 'symbol',
+    source: labelSourceId as any,
+    minzoom: 6,
+    layout: {
+      'text-field': ['format', 'Exclusion Zone\n', {}, typeMapping as any, {}] as any,
+      'text-size': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8, 13,
+        16, 15
+      ],
+      'text-anchor': 'center',
+      'text-font': ['Space Mono Bold'],
+      'text-justify': 'center',
+      'text-line-height': 1.2,
+      'text-allow-overlap': false,
+      'text-ignore-placement': false
+    },
+    paint: {
+      'text-color': '#ffffff',
+      'text-halo-color': colorMapping as any,
+      'text-halo-width': 1.0,
+      'text-halo-blur': 0.0
+    }
+  });
+
+  // Register only the fill layer, and sync outline and label visibility with it
+  registerLayer(layerId, 'Exclusion Zones', true, map);
+
+  // Sync the outline and label layer visibility with the fill layer
+  const originalSetLayoutProperty = map.setLayoutProperty.bind(map);
+  const syncVisibility = (layerIdToSync: string, visibility: string) => {
+    if (layerIdToSync === layerId) {
+      originalSetLayoutProperty(outlineLayerId, 'visibility', visibility);
+      originalSetLayoutProperty(labelLayerId, 'visibility', visibility);
+    }
+  };
+
+  // Override setLayoutProperty to sync visibility
+  (map as any).setLayoutProperty = function(layerIdToOverride: string, name: string, value: any) {
+    originalSetLayoutProperty(layerIdToOverride, name, value);
+    if (name === 'visibility') {
+      syncVisibility(layerIdToOverride, value);
+    }
+    return this;
+  };
 }
