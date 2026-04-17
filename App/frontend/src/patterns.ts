@@ -352,6 +352,89 @@ export function addAngledLinesPattern(
 }
 
 /**
+ * Adds a vertical sine wave pattern to the map (represents air movement)
+ * @param map The MapLibre map instance
+ * @param patternName The name/id for the pattern (default: 'vertical-waves-pattern')
+ * @param options Configuration options for the pattern
+ */
+export function addVerticalWavesPattern(
+  map: MaplibreGL.Map,
+  patternName: string = 'vertical-waves-pattern',
+  options: {
+    width?: number;
+    height?: number;
+    lineWidth?: number;
+    lineColor?: string;
+    lineOpacity?: number;
+    backgroundColor?: string;
+    backgroundOpacity?: number;
+    amplitude?: number;
+    frequency?: number;
+    pixelRatio?: number;
+  } = {}
+): void {
+  const {
+    width = DEFAULT_PATTERN_OPTIONS.width,
+    height = 80,
+    lineWidth = DEFAULT_PATTERN_OPTIONS.lineWidth,
+    lineColor = DEFAULT_PATTERN_OPTIONS.lineColor,
+    lineOpacity = DEFAULT_PATTERN_OPTIONS.lineOpacity,
+    backgroundColor = DEFAULT_PATTERN_OPTIONS.backgroundColor,
+    backgroundOpacity = DEFAULT_PATTERN_OPTIONS.backgroundOpacity,
+    amplitude = width / 6,
+    frequency = 1,
+    pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
+  } = options;
+
+  const canvas = document.createElement('canvas');
+  // Render at higher resolution for anti-aliasing
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const ctx = canvas.getContext('2d')!;
+
+  // Scale context for higher DPI rendering
+  ctx.scale(pixelRatio, pixelRatio);
+
+  // Draw background
+  drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+
+  // Draw vertical sine wave pattern with opacity
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = lineWidth;
+  ctx.globalAlpha = lineOpacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Draw vertical wavy lines (sine waves oriented vertically)
+  const centerX = width / 2;
+
+  ctx.beginPath();
+  ctx.moveTo(centerX, 0);
+  for (let y = 0; y <= height; y += 0.5) {
+    const x = centerX + Math.sin((y / height) * Math.PI * 2 * frequency) * amplitude;
+    ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  // Draw additional waves on the sides for a more continuous pattern
+  for (let offset = -width / 2; offset < width; offset += width / 2) {
+    const waveCenter = centerX + offset;
+    ctx.beginPath();
+    ctx.moveTo(waveCenter, 0);
+    for (let y = 0; y <= height; y += 0.5) {
+      const x = waveCenter + Math.sin((y / height) * Math.PI * 2 * frequency) * amplitude;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = 1; // Reset alpha
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+}
+
+/**
  * Builds a pattern mapping for exclusion zones with support for different pattern types per zone
  * @param map The MapLibre map instance
  * @param zoneTypeEnum The exclusion zone type enum
@@ -383,6 +466,8 @@ export function buildPatternMapping(
       addCrossPattern(map, patternName, { backgroundColor: color, lineColor: color });
     } else if (patternType === PatternType.AngledLines) {
       addAngledLinesPattern(map, patternName, { backgroundColor: color, lineColor: color });
+    } else if (patternType === PatternType.VerticalWaves) {
+      addVerticalWavesPattern(map, patternName, { backgroundColor: color, lineColor: color });
     } else {
       addSolidPattern(map, patternName, { backgroundColor: color });
     }
