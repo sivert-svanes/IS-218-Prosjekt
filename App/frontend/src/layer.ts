@@ -4,8 +4,9 @@ import {
   registerLayer,
 } from './layerControl.js';
 import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId } from './interfaces.js';
-import { calculateBounds, buildEnumMapping } from './utils.js';
-import { ExclusionZoneType } from './enum.js'
+import { calculateBounds, buildEnumMapping, buildColorMapping, buildPatternConfig } from './utils.js';
+import { ExclusionZoneType, exclusionZoneColor, exclusionZonePattern } from './enum.js';
+import { buildPatternMapping } from './patterns.js';
 
 const maplibregl = window.maplibregl;
 
@@ -306,11 +307,6 @@ export function ClearShortestPathLayer(map: MaplibreGL.Map): void {
   if (btn) btn.style.display = 'none';
 }
 
-/**
- * Adds exclusion zones layer to the map and registers it with layer control.
- * @param map The MapLibre map instance
- * @param geojsonData The GeoJSON FeatureCollection with exclusion zones
- */
 export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON.FeatureCollection): void {
   const sourceId = 'exclusion-zones-source';
   const layerId = 'exclusion-zones-layer';
@@ -372,6 +368,14 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     })
   };
 
+  const typeMapping = buildEnumMapping(ExclusionZoneType);
+  const colorMapping = buildColorMapping(ExclusionZoneType, exclusionZoneColor);
+
+  // Build pattern configuration from enum
+  const patternConfig = buildPatternConfig(exclusionZonePattern);
+
+  const patternMapping = buildPatternMapping(map, ExclusionZoneType, exclusionZoneColor, patternConfig);
+
   // Add source for label points
   map.addSource(labelSourceId, {
     type: 'geojson',
@@ -382,10 +386,9 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
   map.addLayer({
     id: layerId,
     type: 'fill',
-    source: sourceId,
+    source: sourceId as any,
     paint: {
-      'fill-color': '#ff0000',
-      'fill-opacity': 0.3
+      'fill-pattern': patternMapping as any,
     }
   });
 
@@ -395,19 +398,17 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     type: 'line',
     source: sourceId,
     paint: {
-      'line-color': '#ff0000',
+      'line-color': colorMapping as any,
       'line-width': 2,
-      'line-opacity': 0.8
+      'line-opacity': 0.6,
+      'line-dasharray': [2, 2]
     }
   });
-
-  // Add text label layer using the point features (no tiling issues with points)
-  const typeMapping = buildEnumMapping(ExclusionZoneType);
 
   map.addLayer({
     id: labelLayerId,
     type: 'symbol',
-    source: labelSourceId,
+    source: labelSourceId as any,
     minzoom: 6,
     layout: {
       'text-field': ['format', 'Exclusion Zone\n', {}, typeMapping as any, {}] as any,
@@ -415,10 +416,11 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
         'interpolate',
         ['linear'],
         ['zoom'],
-        5, 10,
-        15, 14
+        8, 13,
+        16, 15
       ],
       'text-anchor': 'center',
+      'text-font': ['Space Mono Bold'],
       'text-justify': 'center',
       'text-line-height': 1.2,
       'text-allow-overlap': false,
@@ -426,9 +428,9 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     },
     paint: {
       'text-color': '#ffffff',
-      'text-halo-color': '#ff0000',
-      'text-halo-width': 1.5,
-      'text-halo-blur': 0
+      'text-halo-color': colorMapping as any,
+      'text-halo-width': 1.0,
+      'text-halo-blur': 0.0
     }
   });
 
@@ -445,7 +447,6 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
   };
 
   // Override setLayoutProperty to sync visibility
-  const originalMethod = map.setLayoutProperty;
   (map as any).setLayoutProperty = function(layerIdToOverride: string, name: string, value: any) {
     originalSetLayoutProperty(layerIdToOverride, name, value);
     if (name === 'visibility') {

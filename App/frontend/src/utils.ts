@@ -50,6 +50,29 @@ export function buildEnumMapping(enumType: any, defaultValue: string = 'Unknown'
   return mapping;
 }
 
+/**
+ * Builds a MapLibre match expression for color mapping.
+ * Maps enum numeric values to their corresponding colors from a color enum.
+ * @param enumType The numeric enum to convert
+ * @param colorEnum The enum containing color hex values
+ * @param defaultColor The default color to use if no match is found (default: '#cccccc')
+ * @returns A match expression array for use in MapLibre paint properties
+ */
+export function buildColorMapping(enumType: any, colorEnum: any, defaultColor: string = '#cccccc'): any[] {
+  const mapping: any[] = ['match', ['get', 'type']];
+
+  for (const [key, value] of Object.entries(enumType)) {
+    if (!isNaN(Number(key))) continue; // Skip numeric keys
+    const numericValue = Number(value);
+    const color = (colorEnum as any)[key] || defaultColor;
+    mapping.push(numericValue);
+    mapping.push(color);
+  }
+
+  mapping.push(defaultColor);
+  return mapping;
+}
+
 export function decodePolyline6(encoded: string): [number, number][] {
   const coords: [number, number][] = [];
   let index = 0;
@@ -76,4 +99,21 @@ export function decodePolyline6(encoded: string): [number, number][] {
   }
 
   return coords;
+}
+
+/**
+ * Builds a pattern configuration object from a pattern enum.
+ * Maps zone type names to their pattern styles.
+ * @param patternEnum The pattern enum to convert
+ * @returns A pattern configuration object for use in buildPatternMapping
+ */
+export function buildPatternConfig(patternEnum: any): { [key: string]: string } {
+  const config: { [key: string]: string } = {};
+
+  for (const [key, value] of Object.entries(patternEnum)) {
+    if (!isNaN(Number(key))) continue; // Skip numeric keys
+    config[key] = value as string;
+  }
+
+  return config;
 }
