@@ -518,6 +518,111 @@ export function addGammaWavesPattern(
 }
 
 /**
+ * Adds a biological hazard pattern to the map (brick/honeycomb pattern of circles)
+ * @param map The MapLibre map instance
+ * @param patternName The name/id for the pattern (default: 'biological-hazard-pattern')
+ * @param options Configuration options for the pattern
+ */
+export function addBiologicalHazardPattern(
+  map: MaplibreGL.Map,
+  patternName: string = 'biological-hazard-pattern',
+  options: {
+    lineWidth?: number;
+    lineColor?: string;
+    lineOpacity?: number;
+    backgroundColor?: string;
+    backgroundOpacity?: number;
+    pixelRatio?: number;
+  } = {}
+): void {
+  const {
+    lineWidth = 1,
+    lineColor = DEFAULT_PATTERN_OPTIONS.lineColor,
+    lineOpacity = DEFAULT_PATTERN_OPTIONS.lineOpacity,
+    backgroundColor = DEFAULT_PATTERN_OPTIONS.backgroundColor,
+    backgroundOpacity = DEFAULT_PATTERN_OPTIONS.backgroundOpacity,
+    pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
+  } = options;
+
+  const circleRadius = 6;
+  const circleSpacing = circleRadius * 2 + 0.5; // Horizontal spacing (2R for tangent circles)
+  const verticalSpacing = circleRadius * Math.sqrt(3) + 0.5; // Vertical spacing between rows
+
+  // Canvas must be sized to contain exactly one complete cycle of the pattern
+  // Width should contain only 1 circle spacing (so pattern repeats every 2R horizontally)
+  const width = circleSpacing;
+  // Height should contain exactly 2 row spacings (from Row 0 to Row 2)
+  // Subtract a tiny amount to ensure Row 2 touches Row 0 of next tile without overlap
+  const height = verticalSpacing * 2 - 0.1 ;
+
+  const canvas = document.createElement('canvas');
+  // Render at higher resolution for anti-aliasing
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const ctx = canvas.getContext('2d')!;
+
+  // Scale context for higher DPI rendering
+  ctx.scale(pixelRatio, pixelRatio);
+
+  // Draw background
+  drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+
+  // Draw biological hazard brick/honeycomb pattern
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = lineWidth;
+  ctx.globalAlpha = lineOpacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  // Row 0 (even) - circle at position 0 and wrap-around at width
+  // Rotated 180 degrees: flip around center
+  ctx.beginPath();
+  ctx.arc(width, height, circleRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(0, height, circleRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Row 1 (odd) - offset row at verticalSpacing
+  // Rotated 180 degrees
+  const oddRowY = verticalSpacing;
+  ctx.beginPath();
+  ctx.arc(circleRadius + width, height - oddRowY, circleRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Wrap-around circle for odd row
+  ctx.beginPath();
+  ctx.arc(circleRadius, height - oddRowY, circleRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Row 2 (even) - circles at bottom to connect to next tile's Row 0
+  // Rotated 180 degrees
+  const evenRow2Y = oddRowY + verticalSpacing;
+  ctx.beginPath();
+  ctx.arc(width, height - evenRow2Y, circleRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(0, height - evenRow2Y, circleRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Center circle - positioned to align with trefoil symbol
+  // Rotated 180 degrees: offset left instead of right
+  const centerX = width - circleRadius - 0.5;
+  const centerY = height - (oddRowY - 2) / 2;
+  const centerCircleRadius = circleRadius / 1.45;
+  ctx.beginPath();
+  ctx.arc(centerX, centerY, centerCircleRadius, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.globalAlpha = 1; // Reset alpha
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+}
+
+/**
  * Builds a pattern mapping for exclusion zones with support for different pattern types per zone
  * @param map The MapLibre map instance
  * @param zoneTypeEnum The exclusion zone type enum
@@ -553,6 +658,8 @@ export function buildPatternMapping(
       addVerticalWavesPattern(map, patternName, { backgroundColor: color, lineColor: color });
     } else if (patternType === PatternType.GammaWaves) {
       addGammaWavesPattern(map, patternName, { backgroundColor: color, lineColor: color });
+    } else if (patternType === PatternType.BiologicalHazard) {
+      addBiologicalHazardPattern(map, patternName, { backgroundColor: color, lineColor: color });
     } else {
       addSolidPattern(map, patternName, { backgroundColor: color });
     }

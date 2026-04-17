@@ -28,13 +28,14 @@ export enum PatternType {
   Cross   = 'cross',
   AngledLines = 'angled-lines',
   VerticalWaves = 'vertical-waves',
-  GammaWaves = 'gamma-waves'
+  GammaWaves = 'gamma-waves',
+  BiologicalHazard = 'biological-hazard'
 }
 
 export enum exclusionZonePattern {
   'Flood Zone'        = PatternType.Wavy,
   'Radiation Hazard'  = PatternType.GammaWaves,
-  'Biological Hazard' = PatternType.Solid,
+  'Biological Hazard' = PatternType.BiologicalHazard,
   'Toxic Hazard'      = PatternType.Solid,
   'Fire'              = PatternType.Sawtooth,
   'Ruins'             = PatternType.Cross,
