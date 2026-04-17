@@ -1,7 +1,6 @@
 ﻿import type * as MaplibreGL from "maplibre-gl";
 import { PatternType } from './enum.js';
 
-// Default pattern options
 const DEFAULT_PATTERN_OPTIONS = {
   width: 10,
   height: 10,
@@ -12,6 +11,22 @@ const DEFAULT_PATTERN_OPTIONS = {
   backgroundOpacity: 0.3,
   pixelRatio: 2,
 };
+
+/**
+ * Creates a canvas with the specified dimensions and returns a scaled 2D context
+ * @param width The logical width of the canvas
+ * @param height The logical height of the canvas
+ * @param pixelRatio The pixel ratio for high-DPI rendering
+ * @returns Object containing canvas element and scaled 2D context
+ */
+function createScaledCanvas(width: number, height: number, pixelRatio: number): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
+  const canvas = document.createElement('canvas');
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const ctx = canvas.getContext('2d')!;
+  ctx.scale(pixelRatio, pixelRatio);
+  return { canvas, ctx };
+}
 
 /**
  * Draws a background on a canvas context
@@ -28,6 +43,35 @@ function drawBackground(ctx: CanvasRenderingContext2D, width: number, height: nu
     ctx.fillRect(0, 0, width, height);
     ctx.globalAlpha = 1; // Reset alpha
   }
+}
+
+/**
+ * Sets up line drawing styles on a canvas context
+ * @param ctx The 2D canvas context
+ * @param lineColor The color of the line
+ * @param lineWidth The width of the line
+ * @param lineOpacity The opacity of the line (0-1)
+ */
+function setupLineStyle(ctx: CanvasRenderingContext2D, lineColor: string, lineWidth: number, lineOpacity: number): void {
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = lineWidth;
+  ctx.globalAlpha = lineOpacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+}
+
+/**
+ * Finalizes a pattern and adds it to the map
+ * @param map The MapLibre map instance
+ * @param canvas The canvas element containing the pattern
+ * @param patternName The name/id for the pattern
+ * @param pixelRatio The pixel ratio used for rendering
+ */
+function finalizeAndAddPattern(map: MaplibreGL.Map, canvas: HTMLCanvasElement, patternName: string, pixelRatio: number): void {
+  const ctx = canvas.getContext('2d')!;
+  ctx.globalAlpha = 1; // Reset alpha
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
 }
 
 /**
@@ -55,20 +99,9 @@ export function addSolidPattern(
     pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
   } = options;
 
-  const canvas = document.createElement('canvas');
-  // Render at higher resolution for anti-aliasing
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  const ctx = canvas.getContext('2d')!;
-
-  // Scale context for higher DPI rendering
-  ctx.scale(pixelRatio, pixelRatio);
-
-  // Draw background only (no pattern lines)
+  const { canvas, ctx } = createScaledCanvas(width, height, pixelRatio);
   drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+  finalizeAndAddPattern(map, canvas, patternName, pixelRatio);
 }
 
 /**
@@ -102,26 +135,10 @@ export function addSawtoothPattern(
     pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
   } = options;
 
-  const canvas = document.createElement('canvas');
-  // Render at higher resolution for anti-aliasing
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  const ctx = canvas.getContext('2d')!;
-
-  // Scale context for higher DPI rendering
-  ctx.scale(pixelRatio, pixelRatio);
-
-  // Draw background
+  const { canvas, ctx } = createScaledCanvas(width, height, pixelRatio);
   drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+  setupLineStyle(ctx, lineColor, lineWidth, lineOpacity);
 
-  // Draw chevron pattern with opacity
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = lineWidth;
-  ctx.globalAlpha = lineOpacity;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // Draw diagonal lines for chevron effect
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(width / 2, height / 2);
@@ -129,10 +146,7 @@ export function addSawtoothPattern(
   ctx.lineTo(width, 0);
   ctx.stroke();
 
-  ctx.globalAlpha = 1; // Reset alpha
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+  finalizeAndAddPattern(map, canvas, patternName, pixelRatio);
 }
 
 /**
@@ -170,26 +184,10 @@ export function addWavyPattern(
     pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
   } = options;
 
-  const canvas = document.createElement('canvas');
-  // Render at higher resolution for anti-aliasing
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  const ctx = canvas.getContext('2d')!;
-
-  // Scale context for higher DPI rendering
-  ctx.scale(pixelRatio, pixelRatio);
-
-  // Draw background
+  const { canvas, ctx } = createScaledCanvas(width, height, pixelRatio);
   drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+  setupLineStyle(ctx, lineColor, lineWidth, lineOpacity);
 
-  // Draw wavy pattern with opacity
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = lineWidth;
-  ctx.globalAlpha = lineOpacity;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // Draw horizontal wavy lines
   ctx.beginPath();
   const centerY = height / 2;
   ctx.moveTo(0, centerY);
@@ -199,10 +197,7 @@ export function addWavyPattern(
   }
   ctx.stroke();
 
-  ctx.globalAlpha = 1; // Reset alpha
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+  finalizeAndAddPattern(map, canvas, patternName, pixelRatio);
 }
 
 /**
@@ -236,26 +231,10 @@ export function addCrossPattern(
     pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
   } = options;
 
-  const canvas = document.createElement('canvas');
-  // Render at higher resolution for anti-aliasing
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  const ctx = canvas.getContext('2d')!;
-
-  // Scale context for higher DPI rendering
-  ctx.scale(pixelRatio, pixelRatio);
-
-  // Draw background
+  const { canvas, ctx } = createScaledCanvas(width, height, pixelRatio);
   drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+  setupLineStyle(ctx, lineColor, lineWidth, lineOpacity);
 
-  // Draw cross (X) pattern with opacity
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = lineWidth;
-  ctx.globalAlpha = lineOpacity;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // Draw X pattern (two diagonal lines)
   ctx.beginPath();
   ctx.moveTo(0, 0);
   ctx.lineTo(width, height);
@@ -263,10 +242,7 @@ export function addCrossPattern(
   ctx.lineTo(0, height);
   ctx.stroke();
 
-  ctx.globalAlpha = 1; // Reset alpha
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+  finalizeAndAddPattern(map, canvas, patternName, pixelRatio);
 }
 
 /**
@@ -302,35 +278,16 @@ export function addAngledLinesPattern(
     pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
   } = options;
 
-  const canvas = document.createElement('canvas');
-  // Render at higher resolution for anti-aliasing
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  const ctx = canvas.getContext('2d')!;
-
-  // Scale context for higher DPI rendering
-  ctx.scale(pixelRatio, pixelRatio);
-
-  // Draw background
+  const { canvas, ctx } = createScaledCanvas(width, height, pixelRatio);
   drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+  setupLineStyle(ctx, lineColor, lineWidth, lineOpacity);
 
-  // Draw angled lines pattern with opacity
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = lineWidth;
-  ctx.globalAlpha = lineOpacity;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // Draw vertical lines tilted 30 degrees to the right
   const angle = (31 * Math.PI) / 180;
   const lineSpacing = spacing;
   const horizontalShift = height * Math.tan(angle);
 
-  // Draw lines that completely fill the tile and wrap seamlessly
   ctx.beginPath();
 
-  // Start from far left to ensure complete coverage
-  // Lines need to fill from left edge to right edge as they go from top to bottom
   const startOffset = -Math.ceil(horizontalShift);
   const endOffset = width + Math.ceil(horizontalShift);
 
@@ -345,10 +302,7 @@ export function addAngledLinesPattern(
   }
   ctx.stroke();
 
-  ctx.globalAlpha = 1; // Reset alpha
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+  finalizeAndAddPattern(map, canvas, patternName, pixelRatio);
 }
 
 /**
@@ -386,26 +340,10 @@ export function addVerticalWavesPattern(
     pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
   } = options;
 
-  const canvas = document.createElement('canvas');
-  // Render at higher resolution for anti-aliasing
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  const ctx = canvas.getContext('2d')!;
-
-  // Scale context for higher DPI rendering
-  ctx.scale(pixelRatio, pixelRatio);
-
-  // Draw background
+  const { canvas, ctx } = createScaledCanvas(width, height, pixelRatio);
   drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+  setupLineStyle(ctx, lineColor, lineWidth, lineOpacity);
 
-  // Draw vertical sine wave pattern with opacity
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = lineWidth;
-  ctx.globalAlpha = lineOpacity;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // Draw vertical wavy lines (sine waves oriented vertically)
   const centerX = width / 2;
 
   ctx.beginPath();
@@ -416,7 +354,6 @@ export function addVerticalWavesPattern(
   }
   ctx.stroke();
 
-  // Draw additional waves on the sides for a more continuous pattern
   for (let offset = -width / 2; offset < width; offset += width / 2) {
     const waveCenter = centerX + offset;
     ctx.beginPath();
@@ -428,10 +365,7 @@ export function addVerticalWavesPattern(
     ctx.stroke();
   }
 
-  ctx.globalAlpha = 1; // Reset alpha
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+  finalizeAndAddPattern(map, canvas, patternName, pixelRatio);
 }
 
 /**
@@ -469,26 +403,10 @@ export function addGammaWavesPattern(
     pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
   } = options;
 
-  const canvas = document.createElement('canvas');
-  // Render at higher resolution for anti-aliasing
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  const ctx = canvas.getContext('2d')!;
-
-  // Scale context for higher DPI rendering
-  ctx.scale(pixelRatio, pixelRatio);
-
-  // Draw background
+  const { canvas, ctx } = createScaledCanvas(width, height, pixelRatio);
   drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+  setupLineStyle(ctx, lineColor, lineWidth, lineOpacity);
 
-  // Draw tight gamma wave pattern with opacity
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = lineWidth;
-  ctx.globalAlpha = lineOpacity;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // Draw tight horizontal wavy lines with high frequency for gamma waves
   ctx.beginPath();
   const centerY = height / 2;
   ctx.moveTo(0, centerY);
@@ -498,7 +416,6 @@ export function addGammaWavesPattern(
   }
   ctx.stroke();
 
-  // Draw additional waves above and below for density
   for (let offset = -height / 3; offset <= height / 3; offset += height / 3) {
     if (offset === 0) continue; // Skip the center line already drawn
     ctx.beginPath();
@@ -511,10 +428,7 @@ export function addGammaWavesPattern(
     ctx.stroke();
   }
 
-  ctx.globalAlpha = 1; // Reset alpha
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+  finalizeAndAddPattern(map, canvas, patternName, pixelRatio);
 }
 
 /**
@@ -548,34 +462,13 @@ export function addBiologicalHazardPattern(
   const circleSpacing = circleRadius * 2 + 0.5; // Horizontal spacing (2R for tangent circles)
   const verticalSpacing = circleRadius * Math.sqrt(3) + 0.5; // Vertical spacing between rows
 
-  // Canvas must be sized to contain exactly one complete cycle of the pattern
-  // Width should contain only 1 circle spacing (so pattern repeats every 2R horizontally)
   const width = circleSpacing;
-  // Height should contain exactly 2 row spacings (from Row 0 to Row 2)
-  // Subtract a tiny amount to ensure Row 2 touches Row 0 of next tile without overlap
   const height = verticalSpacing * 2 - 0.1 ;
 
-  const canvas = document.createElement('canvas');
-  // Render at higher resolution for anti-aliasing
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  const ctx = canvas.getContext('2d')!;
-
-  // Scale context for higher DPI rendering
-  ctx.scale(pixelRatio, pixelRatio);
-
-  // Draw background
+  const { canvas, ctx } = createScaledCanvas(width, height, pixelRatio);
   drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+  setupLineStyle(ctx, lineColor, lineWidth, lineOpacity);
 
-  // Draw biological hazard brick/honeycomb pattern
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = lineWidth;
-  ctx.globalAlpha = lineOpacity;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
-
-  // Row 0 (even) - circle at position 0 and wrap-around at width
-  // Rotated 180 degrees: flip around center
   ctx.beginPath();
   ctx.arc(width, height, circleRadius, 0, Math.PI * 2);
   ctx.stroke();
@@ -584,20 +477,15 @@ export function addBiologicalHazardPattern(
   ctx.arc(0, height, circleRadius, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Row 1 (odd) - offset row at verticalSpacing
-  // Rotated 180 degrees
   const oddRowY = verticalSpacing;
   ctx.beginPath();
   ctx.arc(circleRadius + width, height - oddRowY, circleRadius, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Wrap-around circle for odd row
   ctx.beginPath();
   ctx.arc(circleRadius, height - oddRowY, circleRadius, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Row 2 (even) - circles at bottom to connect to next tile's Row 0
-  // Rotated 180 degrees
   const evenRow2Y = oddRowY + verticalSpacing;
   ctx.beginPath();
   ctx.arc(width, height - evenRow2Y, circleRadius, 0, Math.PI * 2);
@@ -607,8 +495,6 @@ export function addBiologicalHazardPattern(
   ctx.arc(0, height - evenRow2Y, circleRadius, 0, Math.PI * 2);
   ctx.stroke();
 
-  // Center circle - positioned to align with trefoil symbol
-  // Rotated 180 degrees: offset left instead of right
   const centerX = width - circleRadius - 0.5;
   const centerY = height - (oddRowY - 2) / 2;
   const centerCircleRadius = circleRadius / 1.45;
@@ -616,10 +502,7 @@ export function addBiologicalHazardPattern(
   ctx.arc(centerX, centerY, centerCircleRadius, 0, Math.PI * 2);
   ctx.stroke();
 
-  ctx.globalAlpha = 1; // Reset alpha
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+  finalizeAndAddPattern(map, canvas, patternName, pixelRatio);
 }
 
 /**
@@ -653,31 +536,15 @@ export function addRuinsSquareSineWavePattern(
     pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
   } = options;
 
-  const canvas = document.createElement('canvas');
-  // Render at higher resolution for anti-aliasing
-  canvas.width = width * pixelRatio;
-  canvas.height = height * pixelRatio;
-  const ctx = canvas.getContext('2d')!;
-
-  // Scale context for higher DPI rendering
-  ctx.scale(pixelRatio, pixelRatio);
-
-  // Draw background
+  const { canvas, ctx } = createScaledCanvas(width, height, pixelRatio);
   drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
-
-  // Draw ruins square sine wave pattern
-  ctx.strokeStyle = lineColor;
-  ctx.lineWidth = lineWidth;
-  ctx.globalAlpha = lineOpacity;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+  setupLineStyle(ctx, lineColor, lineWidth, lineOpacity);
 
   const amplitude = height / 2;
   const frequency = 0.25;
   const stepWidth = 4; // Width of each step
   const centerY = height / 2;
 
-  // Draw square sine waves with sharp 90-degree angles
   for (let layerOffset = -height; layerOffset < height * 2; layerOffset += amplitude * 2.5) {
     ctx.beginPath();
 
@@ -685,30 +552,22 @@ export function addRuinsSquareSineWavePattern(
     let direction = 1; // 1 for up, -1 for down
     let currentY = centerY + layerOffset;
 
-    // Draw the wave pattern with sharp corners
     while (x < width + stepWidth) {
-      // Move to start of horizontal line
       ctx.moveTo(x, currentY);
 
-      // Draw horizontal line
       x += stepWidth;
       ctx.lineTo(x, currentY);
 
-      // Change direction for next vertical segment
       direction *= -1;
       currentY += amplitude * direction;
 
-      // Draw vertical line
       ctx.lineTo(x, currentY);
     }
 
     ctx.stroke();
   }
 
-  ctx.globalAlpha = 1; // Reset alpha
-
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+  finalizeAndAddPattern(map, canvas, patternName, pixelRatio);
 }
 export function buildPatternMapping(
   map: MaplibreGL.Map,
@@ -726,7 +585,6 @@ export function buildPatternMapping(
     const patternType = patternConfig[key] || PatternType.Solid; // Default to solid
     const patternName = `${patternType}-pattern-${numericValue}`;
 
-    // Add the pattern to the map based on type
     if (patternType === PatternType.Wavy) {
       addWavyPattern(map, patternName, { backgroundColor: color, lineColor: color });
     } else if (patternType === PatternType.Sawtooth) {
