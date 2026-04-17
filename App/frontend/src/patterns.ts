@@ -623,12 +623,93 @@ export function addBiologicalHazardPattern(
 }
 
 /**
- * Builds a pattern mapping for exclusion zones with support for different pattern types per zone
+ * Adds a ruins square sine wave pattern to the map (sharp angular sine-like waves)
  * @param map The MapLibre map instance
- * @param zoneTypeEnum The exclusion zone type enum
- * @param colorEnum The color enum for each zone type
- * @param patternConfig Configuration for which pattern type each zone should use
+ * @param patternName The name/id for the pattern (default: 'ruins-square-sine-wave-pattern')
+ * @param options Configuration options for the pattern
  */
+export function addRuinsSquareSineWavePattern(
+  map: MaplibreGL.Map,
+  patternName: string = 'ruins-square-sine-wave-pattern',
+  options: {
+    width?: number;
+    height?: number;
+    lineWidth?: number;
+    lineColor?: string;
+    lineOpacity?: number;
+    backgroundColor?: string;
+    backgroundOpacity?: number;
+    pixelRatio?: number;
+  } = {}
+): void {
+  const {
+    width = DEFAULT_PATTERN_OPTIONS.width,
+    height = DEFAULT_PATTERN_OPTIONS.height,
+    lineWidth = DEFAULT_PATTERN_OPTIONS.lineWidth,
+    lineColor = DEFAULT_PATTERN_OPTIONS.lineColor,
+    lineOpacity = DEFAULT_PATTERN_OPTIONS.lineOpacity,
+    backgroundColor = DEFAULT_PATTERN_OPTIONS.backgroundColor,
+    backgroundOpacity = DEFAULT_PATTERN_OPTIONS.backgroundOpacity,
+    pixelRatio = DEFAULT_PATTERN_OPTIONS.pixelRatio,
+  } = options;
+
+  const canvas = document.createElement('canvas');
+  // Render at higher resolution for anti-aliasing
+  canvas.width = width * pixelRatio;
+  canvas.height = height * pixelRatio;
+  const ctx = canvas.getContext('2d')!;
+
+  // Scale context for higher DPI rendering
+  ctx.scale(pixelRatio, pixelRatio);
+
+  // Draw background
+  drawBackground(ctx, width, height, backgroundColor, backgroundOpacity);
+
+  // Draw ruins square sine wave pattern
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = lineWidth;
+  ctx.globalAlpha = lineOpacity;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  const amplitude = height / 2;
+  const frequency = 0.25;
+  const stepWidth = 4; // Width of each step
+  const centerY = height / 2;
+
+  // Draw square sine waves with sharp 90-degree angles
+  for (let layerOffset = -height; layerOffset < height * 2; layerOffset += amplitude * 2.5) {
+    ctx.beginPath();
+
+    let x = 0;
+    let direction = 1; // 1 for up, -1 for down
+    let currentY = centerY + layerOffset;
+
+    // Draw the wave pattern with sharp corners
+    while (x < width + stepWidth) {
+      // Move to start of horizontal line
+      ctx.moveTo(x, currentY);
+
+      // Draw horizontal line
+      x += stepWidth;
+      ctx.lineTo(x, currentY);
+
+      // Change direction for next vertical segment
+      direction *= -1;
+      currentY += amplitude * direction;
+
+      // Draw vertical line
+      ctx.lineTo(x, currentY);
+    }
+
+    ctx.stroke();
+  }
+
+  ctx.globalAlpha = 1; // Reset alpha
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  map.addImage(patternName, imageData, { sdf: false, pixelRatio });
+}
 export function buildPatternMapping(
   map: MaplibreGL.Map,
   zoneTypeEnum: any,
@@ -660,6 +741,8 @@ export function buildPatternMapping(
       addGammaWavesPattern(map, patternName, { backgroundColor: color, lineColor: color });
     } else if (patternType === PatternType.BiologicalHazard) {
       addBiologicalHazardPattern(map, patternName, { backgroundColor: color, lineColor: color });
+    } else if (patternType === PatternType.RuinsSquareSineWave) {
+      addRuinsSquareSineWavePattern(map, patternName, { backgroundColor: color, lineColor: color });
     } else {
       addSolidPattern(map, patternName, { backgroundColor: color });
     }
