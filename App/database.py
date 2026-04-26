@@ -145,7 +145,9 @@ def get_coverage_shelters(engine, scope: str, fylke_id: int | None = None):
                 s.fid,
                 COALESCE(s.plasser, 0)::INT AS plasser,
                 ST_X(ST_Transform(s.posisjon, 25833)) AS x,
-                ST_Y(ST_Transform(s.posisjon, 25833)) AS y
+                ST_Y(ST_Transform(s.posisjon, 25833)) AS y,
+                ST_X(ST_Transform(s.posisjon, 4326)) AS lng,
+                ST_Y(ST_Transform(s.posisjon, 4326)) AS lat
             FROM public.shelters s
             WHERE s.posisjon IS NOT NULL
               AND (
@@ -166,14 +168,33 @@ def get_coverage_shelters(engine, scope: str, fylke_id: int | None = None):
                 "plasser": int(row[1] or 0),
                 "x": float(row[2]),
                 "y": float(row[3]),
+                "lng": float(row[4]),
+                "lat": float(row[5]),
             }
             for row in rows
         ]
 
 
-def get_coverage_population_cells(engine, scope: str, fylke_id: int | None = None):
-    with engine.connect() as conn:
-        rows = conn.execute(text("""
+def get_coverage_population_cells(engine, scope: str, fylke_id: int | None = None, include_geometry: bool = False):
+    if include_geometry:
+        query = text("""
+            SELECT
+                COALESCE(g.poptot, 0)::INT AS poptot,
+                ST_X(ST_PointOnSurface(g.geometry)) AS x,
+                ST_Y(ST_PointOnSurface(g.geometry)) AS y,
+                ST_AsGeoJSON(ST_Transform(g.geometry, 4326)) AS geojson
+            FROM public.befolkning_rutenett_250m_2025 g
+            WHERE :scope = 'norway'
+               OR EXISTS (
+                    SELECT 1
+                    FROM public.fylker f
+                    WHERE f.id = :fylke_id
+                      AND ST_Intersects(g.geometry, ST_Transform(f.geomfylke, 25833))
+               )
+            ORDER BY g.ogc_fid;
+        """)
+    else:
+        query = text("""
             SELECT
                 COALESCE(g.poptot, 0)::INT AS poptot,
                 ST_X(ST_PointOnSurface(g.geometry)) AS x,
@@ -187,44 +208,48 @@ def get_coverage_population_cells(engine, scope: str, fylke_id: int | None = Non
                       AND ST_Intersects(g.geometry, ST_Transform(f.geomfylke, 25833))
                )
             ORDER BY g.ogc_fid;
-        """), {"scope": scope, "fylke_id": fylke_id}).fetchall()
+        """)
 
-        return [
-            {
-                "poptot": int(row[0] or 0),
-                "x": float(row[1]),
-                "y": float(row[2]),
-            }
-            for row in rows
-        ]
-
+    with engine.connect() as conn:
+        rows = conn.execute(query, {"scope": scope, "fylke_id": fylke_id}).fetchall()
+        if include_geometry:
+            return [{"poptot": int(r[0] or 0), "x": float(r[1]), "y": float(r[2]), "geojson": r[3]} for r in rows]
+        else:
+            return [{"poptot": int(r[0] or 0), "x": float(r[1]), "y": float(r[2])} for r in rows]
 
 def calculate_coverage_analysis(shelters, population_cells):
     remaining_capacity = {}
+    shelter_allocated = {}
     normalized_shelters = []
 
     for shelter in shelters:
         fid = shelter.get("fid")
         if fid is None:
             continue
-
         capacity = max(0, int(shelter.get("plasser") or 0))
         normalized = {
             "fid": int(fid),
             "x": float(shelter.get("x")),
             "y": float(shelter.get("y")),
+            "lng": float(shelter.get("lng", 0.0)),
+            "lat": float(shelter.get("lat", 0.0)),
             "plasser": capacity,
         }
         normalized_shelters.append(normalized)
         remaining_capacity[normalized["fid"]] = capacity
+        shelter_allocated[normalized["fid"]] = 0
 
     total_population = 0
     total_capacity = sum(s["plasser"] for s in normalized_shelters)
     covered_population = 0
+    cell_coverages = []
 
     for cell in population_cells:
         people_left = max(0, int(cell.get("poptot") or 0))
+        cell_total = people_left
+
         if people_left <= 0:
+            cell_coverages.append(0.0)
             continue
 
         total_population += people_left
@@ -236,23 +261,26 @@ def calculate_coverage_analysis(shelters, population_cells):
             key=lambda s: ((s["x"] - cx) ** 2 + (s["y"] - cy) ** 2, s["fid"])
         )
 
+        cell_covered = 0
         for shelter in ordered:
             if people_left <= 0:
                 break
-
             available = remaining_capacity.get(shelter["fid"], 0)
             if available <= 0:
                 continue
-
             assigned = min(people_left, available)
-            remaining_capacity[shelter["fid"]] = available - assigned
+            remaining_capacity[shelter["fid"]] -= assigned
+            shelter_allocated[shelter["fid"]] += assigned
             people_left -= assigned
             covered_population += assigned
+            cell_covered += assigned
+
+        cell_coverages.append(cell_covered / cell_total if cell_total > 0 else 0.0)
 
     uncovered_population = total_population - covered_population
     coverage_ratio = (covered_population / total_population) if total_population else 0.0
 
-    return {
+    summary = {
         "total_population": total_population,
         "total_capacity": total_capacity,
         "shelter_count": len(normalized_shelters),
@@ -261,26 +289,71 @@ def calculate_coverage_analysis(shelters, population_cells):
         "coverage_ratio": coverage_ratio,
     }
 
-def get_coverage_analysis(engine, scope: str, fylke_id: int | None = None):
-    cache_key = f"{scope}_{fylke_id}"
+    shelter_features = []
+    for s in normalized_shelters:
+        capacity = s["plasser"]
+        allocated = shelter_allocated.get(s["fid"], 0)
+        shelter_features.append({
+            "type": "Feature",
+            "geometry": {"type": "Point", "coordinates": [s["lng"], s["lat"]]},
+            "properties": {
+                "fid": s["fid"],
+                "capacity": capacity,
+                "allocated": allocated,
+                "remaining": remaining_capacity.get(s["fid"], 0),
+                "utilization": round(allocated / capacity, 3) if capacity > 0 else 0.0,
+                "is_full": remaining_capacity.get(s["fid"], 0) == 0 and capacity > 0,
+            },
+        })
 
-    if cache_key in _coverage_analysis_cache:
+    result = {
+        "summary": summary,
+        "shelters": {"type": "FeatureCollection", "features": shelter_features},
+    }
+
+    # Build cell GeoJSON only when geometry was fetched (county mode)
+    if population_cells and "geojson" in population_cells[0]:
+        cell_features = []
+        for i, cell in enumerate(population_cells):
+            geojson_str = cell.get("geojson")
+            poptot = int(cell.get("poptot") or 0)
+            if not geojson_str or poptot <= 0:
+                continue
+            coverage_pct = cell_coverages[i] if i < len(cell_coverages) else 0.0
+            cell_features.append({
+                "type": "Feature",
+                "geometry": json.loads(geojson_str),
+                "properties": {
+                    "poptot": poptot,
+                    "covered": round(coverage_pct * poptot),
+                    "coverage_pct": round(coverage_pct, 3),
+                },
+            })
+        result["population_cells"] = {"type": "FeatureCollection", "features": cell_features}
+
+    return result
+
+def get_coverage_analysis(engine, scope: str, fylke_id: int | None = None):
+    include_geometry = (scope != 'norway')
+    cache_key = f"{scope}_{fylke_id}_v2"
+
+    if not include_geometry and cache_key in _coverage_analysis_cache:
         print(f"Using cached coverage analysis for {cache_key}")
         return _coverage_analysis_cache[cache_key]
 
     print(f"Calculating coverage analysis for {cache_key}")
 
     shelters = get_coverage_shelters(engine, scope, fylke_id)
-    population_cells = get_coverage_population_cells(engine, scope, fylke_id)
+    population_cells = get_coverage_population_cells(engine, scope, fylke_id, include_geometry=include_geometry)
 
-    summary = calculate_coverage_analysis(shelters, population_cells)
+    result = calculate_coverage_analysis(shelters, population_cells)
 
-    _coverage_analysis_cache[cache_key] = summary
+    if not include_geometry:
+        _coverage_analysis_cache[cache_key] = result
+        with open(CACHE_FILE, "w") as f:
+            json.dump(_coverage_analysis_cache, f)
 
-    with open(CACHE_FILE, "w") as f:
-        json.dump(_coverage_analysis_cache, f)
-
-    return summary
+    return result
 
 def _parse_wkt_polygon(wkt: str) -> list:
     """Parse WKT POLYGON string to GeoJSON coordinates."""

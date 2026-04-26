@@ -125,18 +125,22 @@ def api_coverage_analysis():
 
     try:
         engine = database.create_engine()
-        summary = database.get_coverage_analysis(engine, analysis_scope, fylke_id)
-
-        return flask.jsonify({
+        result = database.get_coverage_analysis(engine, analysis_scope, fylke_id)
+        s = result['summary']
+        response = {
             "summary": {
-                "total_population": int(summary.get("total_population", 0)),
-                "total_capacity": int(summary.get("total_capacity", 0)),
-                "shelter_count": int(summary.get("shelter_count", 0)),
-                "covered_population": int(summary.get("covered_population", 0)),
-                "uncovered_population": int(summary.get("uncovered_population", 0)),
-                "coverage_ratio": float(summary.get("coverage_ratio", 0.0)),
-            }
-        })
+                "total_population": int(s.get("total_population", 0)),
+                "total_capacity": int(s.get("total_capacity", 0)),
+                "shelter_count": int(s.get("shelter_count", 0)),
+                "covered_population": int(s.get("covered_population", 0)),
+                "uncovered_population": int(s.get("uncovered_population", 0)),
+                "coverage_ratio": float(s.get("coverage_ratio", 0.0)),
+            },
+            "shelters": result.get("shelters", {"type": "FeatureCollection", "features": []}),
+        }
+        if "population_cells" in result:
+            response["population_cells"] = result["population_cells"]
+        return flask.jsonify(response)
     except Exception as e:
         print(f"Coverage analysis failed: {e}")
         traceback.print_exc()

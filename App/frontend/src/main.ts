@@ -29,7 +29,7 @@ if (!maplibregl) {
   window.map = map;
   registerKonamiCode(map);
   initializeDropdownMenus();
-  initializeCoverageAnalysis();
+  initializeCoverageAnalysis(map);
 
   const geolocate = new maplibregl.GeolocateControl({
     positionOptions: { enableHighAccuracy: true as boolean },

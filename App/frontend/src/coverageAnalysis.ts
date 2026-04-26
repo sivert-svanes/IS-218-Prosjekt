@@ -1,3 +1,13 @@
+import type * as MaplibreGL from 'maplibre-gl';
+import { registerLayer, deregisterLayer, layerCheckboxes } from './layerControl.js';
+
+// ─── Layer constants ──────────────────────────────────────────────────────────
+const GRID_SOURCE = 'coverage-grid-source';
+const GRID_LAYER  = 'coverage-grid-layer';
+const SHLT_SOURCE = 'coverage-shelter-source';
+const SHLT_LAYER  = 'coverage-shelter-layer';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 type FylkeItem = {
   id: number;
   navn: string;
@@ -12,9 +22,106 @@ type CoverageSummary = {
   coverage_ratio: number;
 };
 
+type GeoJSONFeatureCollection = { type: string; features: any[] };
+
 type CoverageResponse = {
   summary: CoverageSummary;
+  shelters?: GeoJSONFeatureCollection;
+  population_cells?: GeoJSONFeatureCollection;
 };
+
+// ─── Module state ─────────────────────────────────────────────────────────────
+let _shelterClickHandler: ((e: any) => void) | null = null;
+
+// ─── Map layer helpers ────────────────────────────────────────────────────────
+
+function clearCoverageLayers(map: MaplibreGL.Map): void {
+  if (_shelterClickHandler) {
+    map.off('click', SHLT_LAYER, _shelterClickHandler);
+    _shelterClickHandler = null;
+  }
+  if (map.getLayer(GRID_LAYER))  { map.removeLayer(GRID_LAYER);  deregisterLayer(GRID_LAYER); }
+  if (map.getSource(GRID_SOURCE)) map.removeSource(GRID_SOURCE);
+  if (map.getLayer(SHLT_LAYER))  { map.removeLayer(SHLT_LAYER);  deregisterLayer(SHLT_LAYER); }
+  if (map.getSource(SHLT_SOURCE)) map.removeSource(SHLT_SOURCE);
+}
+
+function addGridLayer(map: MaplibreGL.Map, geojson: GeoJSONFeatureCollection): void {
+  if (map.getLayer(GRID_LAYER))  map.removeLayer(GRID_LAYER);
+  if (map.getSource(GRID_SOURCE)) map.removeSource(GRID_SOURCE);
+
+  map.addSource(GRID_SOURCE, { type: 'geojson', data: geojson as any });
+  map.addLayer({
+    id:     GRID_LAYER,
+    type:   'fill',
+    source: GRID_SOURCE,
+    paint:  {
+      'fill-color': [
+        'interpolate', ['linear'], ['get', 'coverage_pct'],
+        0,   '#d73027',
+        0.5, '#fee090',
+        1,   '#1a9850',
+      ] as any,
+      'fill-opacity': 0.6,
+    },
+  });
+
+  if (!layerCheckboxes.has(GRID_LAYER))
+    registerLayer(GRID_LAYER, 'Coverage: Rutenett', true, map);
+}
+
+function addShelterLayer(map: MaplibreGL.Map, geojson: GeoJSONFeatureCollection): void {
+  if (map.getLayer(SHLT_LAYER))  map.removeLayer(SHLT_LAYER);
+  if (map.getSource(SHLT_SOURCE)) map.removeSource(SHLT_SOURCE);
+  if (_shelterClickHandler) map.off('click', SHLT_LAYER, _shelterClickHandler);
+
+  map.addSource(SHLT_SOURCE, { type: 'geojson', data: geojson as any });
+  map.addLayer({
+    id:     SHLT_LAYER,
+    type:   'circle',
+    source: SHLT_SOURCE,
+    paint:  {
+      'circle-radius': 6,
+      'circle-color': [
+        'interpolate', ['linear'], ['get', 'utilization'],
+        0,   '#1a9850',
+        0.5, '#fd8d3c',
+        1,   '#d73027',
+      ] as any,
+      'circle-stroke-width': 1.5,
+      'circle-stroke-color': '#fff',
+    },
+  });
+
+  if (!layerCheckboxes.has(SHLT_LAYER))
+    registerLayer(SHLT_LAYER, 'Coverage: Tilfluktsrom', true, map);
+
+  const mgl = (window as any).maplibregl;
+  if (mgl) {
+    _shelterClickHandler = (e: any) => {
+      if (!e.features?.length) return;
+      const props  = e.features[0].properties as Record<string, any>;
+      const coords = e.features[0].geometry.coordinates as [number, number];
+      new mgl.Popup({ offset: 10 })
+        .setLngLat(coords)
+        .setHTML(`
+          <div style="font-family:'Space Mono',monospace;font-size:12px;max-width:200px;">
+            <b>Tilfluktsrom #${props['fid']}</b>
+            <p style="margin:2px 0">Kapasitet: ${props['capacity']}</p>
+            <p style="margin:2px 0">Tildelt: ${props['allocated']}</p>
+            <p style="margin:2px 0">Ledig: ${props['remaining']}</p>
+            <p style="margin:2px 0">Utnyttelse: ${Math.round(props['utilization'] * 100)}%</p>
+            ${props['is_full'] ? '<p style="color:#d73027;font-weight:bold;margin:4px 0">FULLT</p>' : ''}
+          </div>`)
+        .addTo(map);
+    };
+    map.on('click', SHLT_LAYER, _shelterClickHandler);
+    map.on('mouseenter', SHLT_LAYER, () => { map.getCanvas().style.cursor = 'pointer'; });
+    map.on('mouseleave', SHLT_LAYER, () => { map.getCanvas().style.cursor = ''; });
+  }
+}
+
+// ─── Formatting helpers ───────────────────────────────────────────────────────
 
 function formatInt(value: number): string {
   return new Intl.NumberFormat('nb-NO', { maximumFractionDigits: 0 }).format(value);
@@ -24,6 +131,8 @@ function formatPercent(ratio: number): string {
   return `${(ratio * 100).toFixed(2)}%`;
 }
 
+// ─── API helpers ──────────────────────────────────────────────────────────────
+
 async function fetchFylker(): Promise<FylkeItem[]> {
   const response = await fetch('/api/fylker');
   if (!response.ok) {
@@ -32,8 +141,11 @@ async function fetchFylker(): Promise<FylkeItem[]> {
   return (await response.json()) as FylkeItem[];
 }
 
-function renderResult(resultBox: HTMLElement, summary: CoverageSummary, seconds: string): void {  resultBox.innerHTML = `
-    <div class="coverage-result-title">Coverage Analysis</div {
+// ─── UI render ────────────────────────────────────────────────────────────────
+
+function renderResult(resultBox: HTMLElement, summary: CoverageSummary, seconds: string): void {
+  resultBox.innerHTML = `
+    <div class="coverage-result-title">Coverage Analysis</div>
     <div class="coverage-result-grid">
       <div>Total befolkning</div><div class="coverage-result-value">${formatInt(summary.total_population)}</div>
       <div>Total shelterkapasitet</div><div class="coverage-result-value">${formatInt(summary.total_capacity)}</div>
@@ -52,7 +164,9 @@ function setStatus(statusEl: HTMLElement, message: string, isError: boolean): vo
   statusEl.classList.toggle('error', isError);
 }
 
-export function initializeCoverageAnalysis(): void {
+// ─── Public API ───────────────────────────────────────────────────────────────
+
+export function initializeCoverageAnalysis(map: MaplibreGL.Map): void {
   const overlay = document.querySelector('.map-overlay.container') as HTMLElement | null;
   if (!overlay) {
     return;
@@ -122,6 +236,8 @@ export function initializeCoverageAnalysis(): void {
 
   closeBtn.addEventListener('click', () => {
     panel.classList.remove('is-open');
+    resultBox.classList.remove('is-visible');
+    clearCoverageLayers(map);
   });
 
   runBtn.addEventListener('click', async () => {
@@ -132,25 +248,33 @@ export function initializeCoverageAnalysis(): void {
 
     runBtn.disabled = true;
     setStatus(statusEl, 'Running analysis...', false);
+    clearCoverageLayers(map);
 
-   try {
-  const startTime = performance.now();
+    try {
+      const startTime = performance.now();
+      const response = await fetch(url);
+      const endTime = performance.now();
+      const seconds = ((endTime - startTime) / 1000).toFixed(2);
 
-  const response = await fetch(url);
-
-  const endTime = performance.now();
-  const seconds = ((endTime - startTime) / 1000).toFixed(2);
-
-  const data = (await response.json()) as CoverageResponse | { error?: string };
+      const data = (await response.json()) as CoverageResponse | { error?: string };
 
       if (!response.ok || !('summary' in data)) {
         const message = 'error' in data && data.error ? data.error : 'Analysis failed.';
         throw new Error(message);
       }
 
-      renderResult(resultBox, data.summary, seconds);
+      renderResult(resultBox, (data as CoverageResponse).summary, seconds);
       setStatus(statusEl, 'Done.', false);
       panel.classList.remove('is-open');
+
+      const coverageData = data as CoverageResponse;
+      if (coverageData.shelters) {
+        addShelterLayer(map, coverageData.shelters);
+      }
+      if (coverageData.population_cells) {
+        addGridLayer(map, coverageData.population_cells);
+      }
+
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       setStatus(statusEl, `Error: ${message}`, true);
@@ -160,4 +284,3 @@ export function initializeCoverageAnalysis(): void {
     }
   });
 }
-
