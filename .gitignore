@@ -208,3 +208,6 @@ __marimo__/
 /App/static/js/
 /App/frontend/node_modules/
 /App/.tile_cache/
+
+
+.claude/
