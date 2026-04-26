@@ -25,6 +25,7 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
       <h3 style="margin: 0 0 6px 0; font-size: 14px;">Tilfluktsrom - ${props.romnr || 'Ukjent adresse'}</h3>
       ${props.plasser ? `<p style="margin: 2px 0;"><strong>Kapasitet:</strong> ${props.plasser} personer</p>` : ''}
       ${props.adresse ? `<p style="margin: 2px 0;"><strong>Adresse:</strong> ${props.adresse}</p>` : ''}
+      ${props.antall_plasser_igjen ? `<p style="margin: 2px 0;"><strong>Antall Plasser Igjen:</strong> ${props.antall_plasser_igjen}</p>` : ''}
       <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
     </div>`;
 
@@ -38,6 +39,21 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
   if (maplibregl) {
     new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
   }
+
+  fetch(`/api/shelter-status/${fid}`)
+    .then((res) => res.json())
+    .then((data) => {
+      const el = document.getElementById(props.fid);
+      if (el) {
+        el.textContent = data?.antall_plasser_igjen ?? 'Ukjent';
+      }
+    })
+    .catch(() => {
+      const el = document.getElementById(props.fid);
+      if (el) {
+        el.textContent = 'Feil ved lasting';
+      }
+    });
 }
 // Layer configuration constants
 // Geonorge Vann og vassdrag layers
