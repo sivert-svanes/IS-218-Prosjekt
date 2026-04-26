@@ -52,8 +52,8 @@ def create_engine():
             CONN_STR,
             future=True,
             poolclass=QueuePool,
-            pool_size=5,
-            max_overflow=5,
+            pool_size=1,
+            max_overflow=1,
             pool_recycle=1800,  # Recycle connections after 30 min
             pool_pre_ping=True,  # Test connections before using
             pool_timeout=10,  # Wait up to 10 seconds for a connection
@@ -135,28 +135,29 @@ def get_coverage_shelters(engine, scope: str, fylke_id: int | None = None):
         rows = conn.execute(text("""
             SELECT
                 s.fid,
-                COALESCE(s.navn, '') AS navn,
                 COALESCE(s.plasser, 0)::INT AS plasser,
                 ST_X(ST_Transform(s.posisjon, 25833)) AS x,
                 ST_Y(ST_Transform(s.posisjon, 25833)) AS y
             FROM public.shelters s
-            WHERE :scope = 'norway'
-               OR EXISTS (
-                    SELECT 1
-                    FROM public.fylker f
-                    WHERE f.id = :fylke_id
-                      AND ST_Covers(f.geomfylke, s.posisjon)
-               )
+            WHERE s.posisjon IS NOT NULL
+              AND (
+                    :scope = 'norway'
+                    OR EXISTS (
+                        SELECT 1
+                        FROM public.fylker f
+                        WHERE f.id = :fylke_id
+                          AND ST_Covers(f.geomfylke, s.posisjon)
+                    )
+              )
             ORDER BY s.fid;
         """), {"scope": scope, "fylke_id": fylke_id}).fetchall()
 
         return [
             {
                 "fid": int(row[0]),
-                "navn": row[1],
-                "plasser": int(row[2] or 0),
-                "x": float(row[3]),
-                "y": float(row[4]),
+                "plasser": int(row[1] or 0),
+                "x": float(row[2]),
+                "y": float(row[3]),
             }
             for row in rows
         ]
@@ -252,12 +253,29 @@ def calculate_coverage_analysis(shelters, population_cells):
         "coverage_ratio": coverage_ratio,
     }
 
+_coverage_analysis_cache = {}
+
 
 def get_coverage_analysis(engine, scope: str, fylke_id: int | None = None):
+    cache_key = f"{scope}_{fylke_id}"
+
+    if cache_key in _coverage_analysis_cache:
+        print(f"Using cached coverage analysis for {cache_key}")
+        return _coverage_analysis_cache[cache_key]
+
+    print(f"Calculating coverage analysis for {cache_key}")
+
     shelters = get_coverage_shelters(engine, scope, fylke_id)
     population_cells = get_coverage_population_cells(engine, scope, fylke_id)
-    return calculate_coverage_analysis(shelters, population_cells)
 
+    summary = calculate_coverage_analysis(shelters, population_cells)
+
+    _coverage_analysis_cache[cache_key] = summary
+
+    with open(CACHE_FILE, "w") as f:
+        json.dump(_coverage_analysis_cache, f)
+
+    return summary
 
 def _parse_wkt_polygon(wkt: str) -> list:
     """Parse WKT POLYGON string to GeoJSON coordinates."""

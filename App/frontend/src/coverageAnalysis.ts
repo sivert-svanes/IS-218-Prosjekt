@@ -32,9 +32,8 @@ async function fetchFylker(): Promise<FylkeItem[]> {
   return (await response.json()) as FylkeItem[];
 }
 
-function renderResult(resultBox: HTMLElement, summary: CoverageSummary): void {
-  resultBox.innerHTML = `
-    <div class="coverage-result-title">Coverage Analysis</div>
+function renderResult(resultBox: HTMLElement, summary: CoverageSummary, seconds: string): void {  resultBox.innerHTML = `
+    <div class="coverage-result-title">Coverage Analysis</div {
     <div class="coverage-result-grid">
       <div>Total befolkning</div><div class="coverage-result-value">${formatInt(summary.total_population)}</div>
       <div>Total shelterkapasitet</div><div class="coverage-result-value">${formatInt(summary.total_capacity)}</div>
@@ -42,6 +41,7 @@ function renderResult(resultBox: HTMLElement, summary: CoverageSummary): void {
       <div>Personer som fikk plass</div><div class="coverage-result-value">${formatInt(summary.covered_population)}</div>
       <div>Personer uten plass</div><div class="coverage-result-value">${formatInt(summary.uncovered_population)}</div>
       <div>Dekningsgrad</div><div class="coverage-result-value">${formatPercent(summary.coverage_ratio)}</div>
+      <div>Query time</div><div class="coverage-result-value">${seconds} sec</div>
     </div>
   `;
   resultBox.classList.add('is-visible');
@@ -133,16 +133,22 @@ export function initializeCoverageAnalysis(): void {
     runBtn.disabled = true;
     setStatus(statusEl, 'Running analysis...', false);
 
-    try {
-      const response = await fetch(url);
-      const data = (await response.json()) as CoverageResponse | { error?: string };
+   try {
+  const startTime = performance.now();
+
+  const response = await fetch(url);
+
+  const endTime = performance.now();
+  const seconds = ((endTime - startTime) / 1000).toFixed(2);
+
+  const data = (await response.json()) as CoverageResponse | { error?: string };
 
       if (!response.ok || !('summary' in data)) {
         const message = 'error' in data && data.error ? data.error : 'Analysis failed.';
         throw new Error(message);
       }
 
-      renderResult(resultBox, data.summary);
+      renderResult(resultBox, data.summary, seconds);
       setStatus(statusEl, 'Done.', false);
       panel.classList.remove('is-open');
     } catch (error) {
