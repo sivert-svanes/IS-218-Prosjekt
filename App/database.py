@@ -1,4 +1,5 @@
 ﻿import os
+import json
 import math
 import sqlalchemy
 from sqlalchemy import text
@@ -8,6 +9,13 @@ from enum import Enum
 
 load_dotenv()
 CONN_STR = os.getenv("DATABASE_URL")
+CACHE_FILE = "coverage_cache.json"
+
+if os.path.exists(CACHE_FILE):
+    with open(CACHE_FILE, "r") as f:
+        _coverage_analysis_cache = json.load(f)
+else:
+    _coverage_analysis_cache = {}
 
 # Constants for Web Mercator conversion (EPSG:3857)
 _MERCATOR_HALF = 20037508.34
@@ -52,8 +60,8 @@ def create_engine():
             CONN_STR,
             future=True,
             poolclass=QueuePool,
-            pool_size=1,
-            max_overflow=1,
+            pool_size=5,
+            max_overflow=5,
             pool_recycle=1800,  # Recycle connections after 30 min
             pool_pre_ping=True,  # Test connections before using
             pool_timeout=10,  # Wait up to 10 seconds for a connection
@@ -252,9 +260,6 @@ def calculate_coverage_analysis(shelters, population_cells):
         "uncovered_population": uncovered_population,
         "coverage_ratio": coverage_ratio,
     }
-
-_coverage_analysis_cache = {}
-
 
 def get_coverage_analysis(engine, scope: str, fylke_id: int | None = None):
     cache_key = f"{scope}_{fylke_id}"
