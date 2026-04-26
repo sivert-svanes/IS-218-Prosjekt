@@ -96,6 +96,52 @@ def api_fylke(fylke_id):
     geojson = database.get_shelters_within_fylke(engine, fylke_id)
     return flask.jsonify(geojson)
 
+@app.route('/api/fylker')
+def api_fylker():
+    try:
+        engine = database.create_engine()
+        fylker = database.get_fylker(engine)
+        return flask.jsonify(fylker)
+    except Exception as e:
+        print(f"Error fetching fylker: {e}")
+        traceback.print_exc()
+        return flask.jsonify([])
+
+
+@app.route('/api/coverage-analysis', methods=['GET'])
+def api_coverage_analysis():
+    scope = (flask.request.args.get('scope') or '').strip().lower()
+    fylke_id = flask.request.args.get('fylke_id', type=int)
+
+    if scope == 'norway':
+        analysis_scope = 'norway'
+        fylke_id = None
+    elif fylke_id is not None:
+        analysis_scope = 'county'
+    else:
+        return flask.jsonify({
+            "error": "Provide either scope=norway or fylke_id=<id>."
+        }), 400
+
+    try:
+        engine = database.create_engine()
+        summary = database.get_coverage_analysis(engine, analysis_scope, fylke_id)
+
+        return flask.jsonify({
+            "summary": {
+                "total_population": int(summary.get("total_population", 0)),
+                "total_capacity": int(summary.get("total_capacity", 0)),
+                "shelter_count": int(summary.get("shelter_count", 0)),
+                "covered_population": int(summary.get("covered_population", 0)),
+                "uncovered_population": int(summary.get("uncovered_population", 0)),
+                "coverage_ratio": float(summary.get("coverage_ratio", 0.0)),
+            }
+        })
+    except Exception as e:
+        print(f"Coverage analysis failed: {e}")
+        traceback.print_exc()
+        return flask.jsonify({"error": "Coverage analysis failed"}), 500
+
 @app.route('/api/valhalla-route', methods=['POST'])
 def valhalla_route():
     """Proxy one-to-many matrix requests to Valhalla routing engine using Matrix API.

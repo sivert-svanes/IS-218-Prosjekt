@@ -120,6 +120,145 @@ def get_k_nearest_shelters(engine, lat: float, lng: float, k: int = 10):
         return row[0] if row else {"type": "FeatureCollection", "features": []}
 
 
+def get_fylker(engine):
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT id, navn
+            FROM public.fylker
+            ORDER BY id;
+        """)).fetchall()
+        return [{"id": int(row[0]), "navn": row[1]} for row in rows]
+
+
+def get_coverage_shelters(engine, scope: str, fylke_id: int | None = None):
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT
+                s.fid,
+                COALESCE(s.navn, '') AS navn,
+                COALESCE(s.plasser, 0)::INT AS plasser,
+                ST_X(ST_Transform(s.posisjon, 25833)) AS x,
+                ST_Y(ST_Transform(s.posisjon, 25833)) AS y
+            FROM public.shelters s
+            WHERE :scope = 'norway'
+               OR EXISTS (
+                    SELECT 1
+                    FROM public.fylker f
+                    WHERE f.id = :fylke_id
+                      AND ST_Covers(f.geomfylke, s.posisjon)
+               )
+            ORDER BY s.fid;
+        """), {"scope": scope, "fylke_id": fylke_id}).fetchall()
+
+        return [
+            {
+                "fid": int(row[0]),
+                "navn": row[1],
+                "plasser": int(row[2] or 0),
+                "x": float(row[3]),
+                "y": float(row[4]),
+            }
+            for row in rows
+        ]
+
+
+def get_coverage_population_cells(engine, scope: str, fylke_id: int | None = None):
+    with engine.connect() as conn:
+        rows = conn.execute(text("""
+            SELECT
+                COALESCE(g.poptot, 0)::INT AS poptot,
+                ST_X(ST_PointOnSurface(g.geometry)) AS x,
+                ST_Y(ST_PointOnSurface(g.geometry)) AS y
+            FROM public.befolkning_rutenett_250m_2025 g
+            WHERE :scope = 'norway'
+               OR EXISTS (
+                    SELECT 1
+                    FROM public.fylker f
+                    WHERE f.id = :fylke_id
+                      AND ST_Intersects(g.geometry, ST_Transform(f.geomfylke, 25833))
+               )
+            ORDER BY g.ogc_fid;
+        """), {"scope": scope, "fylke_id": fylke_id}).fetchall()
+
+        return [
+            {
+                "poptot": int(row[0] or 0),
+                "x": float(row[1]),
+                "y": float(row[2]),
+            }
+            for row in rows
+        ]
+
+
+def calculate_coverage_analysis(shelters, population_cells):
+    remaining_capacity = {}
+    normalized_shelters = []
+
+    for shelter in shelters:
+        fid = shelter.get("fid")
+        if fid is None:
+            continue
+
+        capacity = max(0, int(shelter.get("plasser") or 0))
+        normalized = {
+            "fid": int(fid),
+            "x": float(shelter.get("x")),
+            "y": float(shelter.get("y")),
+            "plasser": capacity,
+        }
+        normalized_shelters.append(normalized)
+        remaining_capacity[normalized["fid"]] = capacity
+
+    total_population = 0
+    total_capacity = sum(s["plasser"] for s in normalized_shelters)
+    covered_population = 0
+
+    for cell in population_cells:
+        people_left = max(0, int(cell.get("poptot") or 0))
+        if people_left <= 0:
+            continue
+
+        total_population += people_left
+        cx = float(cell.get("x"))
+        cy = float(cell.get("y"))
+
+        ordered = sorted(
+            normalized_shelters,
+            key=lambda s: ((s["x"] - cx) ** 2 + (s["y"] - cy) ** 2, s["fid"])
+        )
+
+        for shelter in ordered:
+            if people_left <= 0:
+                break
+
+            available = remaining_capacity.get(shelter["fid"], 0)
+            if available <= 0:
+                continue
+
+            assigned = min(people_left, available)
+            remaining_capacity[shelter["fid"]] = available - assigned
+            people_left -= assigned
+            covered_population += assigned
+
+    uncovered_population = total_population - covered_population
+    coverage_ratio = (covered_population / total_population) if total_population else 0.0
+
+    return {
+        "total_population": total_population,
+        "total_capacity": total_capacity,
+        "shelter_count": len(normalized_shelters),
+        "covered_population": covered_population,
+        "uncovered_population": uncovered_population,
+        "coverage_ratio": coverage_ratio,
+    }
+
+
+def get_coverage_analysis(engine, scope: str, fylke_id: int | None = None):
+    shelters = get_coverage_shelters(engine, scope, fylke_id)
+    population_cells = get_coverage_population_cells(engine, scope, fylke_id)
+    return calculate_coverage_analysis(shelters, population_cells)
+
+
 def _parse_wkt_polygon(wkt: str) -> list:
     """Parse WKT POLYGON string to GeoJSON coordinates."""
     wkt = wkt.strip()

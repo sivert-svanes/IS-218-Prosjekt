@@ -279,3 +279,115 @@ html, body {
   font-weight: 700;
   font-style: italic;
 }
+
+.coverage-panel {
+    position: fixed;
+    top: 56px;
+    left: 12px;
+    z-index: 10000;
+    min-width: 280px;
+    max-width: 320px;
+    background: rgba(15,25,30,0.88);
+    color: #c2c8ca;
+    border-radius: 6px;
+    padding: 10px;
+    outline: 2px solid rgba(15,25,30,0.65);
+    box-shadow: 0 4px 12px rgba(15,25,30,0.35);
+    display: none;
+}
+
+.coverage-panel.is-open {
+    display: block;
+}
+
+.coverage-panel-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+}
+
+.coverage-panel-label {
+    display: block;
+    font-size: 0.75rem;
+    margin-bottom: 6px;
+}
+
+.coverage-select {
+    width: 100%;
+    padding: 6px;
+    border-radius: 4px;
+    background: rgba(15,25,30,0.55);
+    color: #c2c8ca;
+    border: 1px solid rgba(194,200,202,0.45);
+}
+
+.coverage-status {
+    min-height: 16px;
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: #9cd7ff;
+}
+
+.coverage-status.error {
+    color: #ff9b9b;
+}
+
+.coverage-panel-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.coverage-btn {
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 4px;
+    border: 1px solid rgba(194,200,202,0.35);
+    background: rgba(15,25,30,0.6);
+    color: #c2c8ca;
+}
+
+.coverage-btn:hover {
+    background: rgba(15,25,30,0.8);
+}
+
+.coverage-result-box {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 10000;
+    min-width: 300px;
+    max-width: 360px;
+    background: rgba(15,25,30,0.88);
+    color: #c2c8ca;
+    border-radius: 6px;
+    padding: 10px;
+    outline: 2px solid rgba(15,25,30,0.65);
+    box-shadow: 0 4px 12px rgba(15,25,30,0.35);
+    display: none;
+}
+
+.coverage-result-box.is-visible {
+    display: block;
+}
+
+.coverage-result-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #fff;
+    margin-bottom: 8px;
+}
+
+.coverage-result-grid {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 4px 10px;
+    font-size: 0.82rem;
+}
+
+.coverage-result-value {
+    color: #fff;
+    font-weight: 700;
+}
