@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='/style/style.css')}}" onerror="href='../static/style/style.css';">
     <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
     <link href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.3/mapbox-gl-draw.js"></script>
+    <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.4.3/mapbox-gl-draw.css" type="text/css" />
   </head>
 
   <body style="margin: 0;">
@@ -17,6 +19,7 @@
         <button onclick="selectMode('find-shelter')" style="display: block; width: 100%; padding: 12px; margin: 10px 0; font-size: 16px; cursor: pointer; border: none; background: #667eea; color: white; border-radius: 4px;">Finn tilfluktsrom</button>
         <button onclick="selectMode('logistics')" style="display: block; width: 100%; padding: 12px; margin: 10px 0; font-size: 16px; cursor: pointer; border: none; background: #667eea; color: white; border-radius: 4px;">Logistikk</button>
         <button onclick="selectMode('landsoversikt')" style="display: block; width: 100%; padding: 12px; margin: 10px 0; font-size: 16px; cursor: pointer; border: none; background: #667eea; color: white; border-radius: 4px;">Landsoversikt</button>
+        <button onclick="selectMode('add-exclusion')" style="display: block; width: 100%; padding: 12px; margin: 10px 0; font-size: 16px; cursor: pointer; border: none; background: #667eea; color: white; border-radius: 4px;">Legg til område</button>
       </div>
     </div>
 
@@ -43,6 +46,13 @@
 
       <div class="box text prevent-select button" id="clear-path-btn" style="display: none;">
         <span style="position: relative; z-index: 2;">✕</span>
+      </div>
+
+      <div id="exclusion-draw-controls" style="display: none; align-items: stretch;">
+          <select id="exclusion-type-select" class="box text" style="background: rgba(15,25,30,0.5); color: #c2c8ca; border: none; border-radius: 0.25rem; margin: 0.25rem; padding: 0.25rem 0.5rem;"></select>
+          <div class="box text prevent-select button" id="draw-start-btn">Tegn</div>
+          <div class="box text prevent-select button" id="draw-save-btn" style="display: none;">Lagre</div>
+          <div class="box text prevent-select button" id="draw-cancel-btn">Avbryt</div>
       </div>
 
     </div>
@@ -80,6 +90,8 @@
       window.zoomToNorway();
       document.getElementById('dekningsgrad-btn').style.display = 'block';
 
+    } else if (mode === 'add-exclusion') {
+        document.getElementById('exclusion-draw-controls').style.display = 'flex';
     }
   }
 
@@ -92,6 +104,8 @@
 
     document.getElementById('shortest-path-btn').style.display = 'none';
     document.getElementById('clear-path-btn').style.display = 'none';
+    document.getElementById('exclusion-draw-controls').style.display = 'none';
+    if (window.cancelDrawing) window.cancelDrawing();
   }
 
 

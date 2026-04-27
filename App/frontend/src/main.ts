@@ -10,7 +10,8 @@ import {
 import {registerStyleInMenu, initializeDropdownMenus} from './layerControl.js'
 import {registerStyle} from "./mapStyles.js";
 import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
-import { initializeExclusionZones } from './exclusion.js'
+import { initializeExclusionZones, refreshExclusionZones } from './exclusion.js'
+import { initializeExclusionDraw } from './exclusionDraw.js';
 import { initializeCoverageAnalysis } from './coverageAnalysis.js'
 import { initShelterDetailsModal } from './shelterDetails.js';
 import { getMapStyle, GLOBE_FADE_CONFIG, DARK_PAINTS } from './mapStyles.js';
@@ -242,6 +243,9 @@ if (!maplibregl) {
     const fylkeIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     (async () => {
       await initializeExclusionZones(map);
+      initializeExclusionDraw(map);
+      // @ts-ignore
+      window.refreshExclusionZones = () => refreshExclusionZones(map);
       await AddShelterLayerGeospatial(map, fylkeIds);
       await AddAmenityLayers(map);
       AddDSBWmsLayers(map);
