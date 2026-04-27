@@ -10,6 +10,7 @@ import {registerStyleInMenu, initializeDropdownMenus} from './layerControl.js'
 import {registerStyle} from "./mapStyles.js";
 import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
 import { initializeExclusionZones } from './exclusion.js'
+import { initializeCoverageAnalysis } from './coverageAnalysis.js'
 import { getMapStyle, GLOBE_FADE_CONFIG, DARK_PAINTS } from './mapStyles.js';
 import './interfaces.js';
 
@@ -28,6 +29,7 @@ if (!maplibregl) {
   window.map = map;
   registerKonamiCode(map);
   initializeDropdownMenus();
+  initializeCoverageAnalysis(map);
 
   const geolocate = new maplibregl.GeolocateControl({
     positionOptions: { enableHighAccuracy: true as boolean },
