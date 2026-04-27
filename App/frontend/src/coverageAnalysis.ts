@@ -193,15 +193,15 @@ function renderResult(
     : '';
 
   resultBox.innerHTML = `
-    <div class="coverage-result-title">Coverage Analysis${regionHtml}</div>
+    <div class="coverage-result-title">Dekningsgrad analyse${regionHtml}</div>
     <div class="coverage-pct-bar-wrap">
       <div class="coverage-pct-bar-fill" style="width:${Math.min(pct * 100, 100)}%;background:${barColor};"></div>
     </div>
     <div class="coverage-pct-label ${pctClass}">${pctPct}% dekket</div>
     <div class="coverage-result-grid">
       <div>Total befolkning</div><div class="coverage-result-value">${formatInt(summary.total_population)}</div>
-      <div>Total shelterkapasitet</div><div class="coverage-result-value">${formatInt(summary.total_capacity)}</div>
-      <div>Antall shelters</div><div class="coverage-result-value">${formatInt(summary.shelter_count)}</div>
+      <div>Total tilfluktsrom kapasitet</div><div class="coverage-result-value">${formatInt(summary.total_capacity)}</div>
+      <div>Antall tilfluktsrom</div><div class="coverage-result-value">${formatInt(summary.shelter_count)}</div>
       <div>Personer som fikk plass</div><div class="coverage-result-value cv-ok-text">${formatInt(summary.covered_population)}</div>
       <div>Personer uten plass</div><div class="coverage-result-value cv-no-text">${formatInt(summary.uncovered_population)}</div>
       <div>Dekningsgrad</div><div class="coverage-result-value ${pctClass}">${formatPercent(summary.coverage_ratio)}</div>
@@ -227,22 +227,22 @@ export function initializeCoverageAnalysis(map: MaplibreGL.Map): void {
   const button = document.createElement('div');
   button.id = 'coverage-analysis-btn';
   button.className = 'box text prevent-select button';
-  button.textContent = 'Coverage Analysis';
+  button.textContent = 'Dekningsgrad';
   overlay.appendChild(button);
 
   const panel = document.createElement('div');
   panel.id = 'coverage-analysis-panel';
   panel.className = 'coverage-panel';
   panel.innerHTML = `
-    <div class="coverage-panel-title">Coverage Analysis</div>
+    <div class="coverage-panel-title">Dekningsgrad analyse</div>
     <label class="coverage-panel-label" for="coverage-area-select">Velg område</label>
     <select id="coverage-area-select" class="coverage-select">
       <option value="norway">Hele Norge</option>
     </select>
     <div id="coverage-status" class="coverage-status"></div>
     <div class="coverage-panel-actions">
-      <button id="coverage-close-btn" class="coverage-btn" type="button">Close</button>
-      <button id="coverage-run-btn" class="coverage-btn" type="button">Run analysis</button>
+      <button id="coverage-close-btn" class="coverage-btn" type="button">Lukk</button>
+      <button id="coverage-run-btn" class="coverage-btn" type="button">Kjør analyse</button>
     </div>
   `;
   document.body.appendChild(panel);

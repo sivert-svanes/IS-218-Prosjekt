@@ -1,14 +1,14 @@
 ﻿import type * as MaplibreGL from "maplibre-gl";
 
 export const amenityLabels: Record<string, string> = {
-    'convenience': 'Convenience Store',
-    'doctors': 'Doctors clinic',
-    'drinking_water': 'Drinking Water',
-    'hardware': 'Hardware Store',
-    'supermarket': 'Supermarket',
-    'trade': 'Trade Store',
-    'hospital': 'Hospital',
-    'chemist': 'Pharmacy',
+    'convenience': 'Butikk',
+    'doctors': 'Sykepleie',
+    'drinking_water': 'Drikkevann',
+    'hardware': 'Varebutikk',
+    'supermarket': 'Matbutikk',
+    'trade': 'Byggvarebutikk',
+    'hospital': 'Sykehus',
+    'chemist': 'Apotek',
   };
 
 /**
@@ -18,22 +18,22 @@ export const amenityButtons: Record<string, { fields: string[], keys: string[], 
   water: {
     fields: ['vann', 'water'],
     keys: ['water'],
-    icon: 'Find Water'
+    icon: 'Finn drikkevann'
   },
   food: {
     fields: ['mat', 'food', 'provisions'],
     keys: ['convenience', 'supermarket'],
-    icon: 'Find Food'
+    icon: 'Finn mat'
   },
   equipment: {
     fields: ['utstyr', 'equipment', 'tools'],
     keys: ['trade', 'hardware'],
-    icon: 'Find Equipment'
+    icon: 'Finn utstyr'
   },
   medicine: {
     fields: ['medisin', 'medicine', 'health'],
     keys: ['hospital', 'chemist', 'doctors'],
-    icon: 'Find Medicine'
+    icon: 'Finn medisin'
   }
 };
 
@@ -95,6 +95,7 @@ export function initShelterDetailsModal(map: MaplibreGL.Map): void {
         <div class="modal-content">
           <button class="modal-close" onclick="window.closeShelterDetailsModal()">&times;</button>
           <h2>${data.romnr || 'Tilfluktsrom'}</h2>
+          <button class="hospital-button" data-building-keys="hospital" data-shelter-lat="${shelterLat}" data-shelter-lng="${shelterLng}" style="width: 100%; margin-bottom: 20px;">Finn sykehus</button>
           <div class="modal-details">
             ${detailsHTML}
           </div>
@@ -103,8 +104,8 @@ export function initShelterDetailsModal(map: MaplibreGL.Map): void {
 
       document.body.appendChild(modalContent);
 
-      // Add event listeners to route buttons
-      modalContent.querySelectorAll('.route-button').forEach((button: Element) => {
+      // Add event listeners to route buttons (including hospital button)
+      modalContent.querySelectorAll('.route-button, .hospital-button').forEach((button: Element) => {
         button.addEventListener('click', async (e: Event) => {
           e.preventDefault();
           const buildingKeysStr = (button as HTMLElement).getAttribute('data-building-keys');

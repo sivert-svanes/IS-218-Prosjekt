@@ -573,4 +573,29 @@ html, body {
   transform: translateY(0);
 }
 
+.hospital-button {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  width: 100%;
+}
+
+.hospital-button:hover {
+  background: #c0392b;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+}
+
+.hospital-button:active {
+  background: #a93226;
+  transform: translateY(0);
+}
+
+
 
