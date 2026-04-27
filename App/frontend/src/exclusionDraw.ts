@@ -39,7 +39,7 @@ export function initializeExclusionDraw(map: Map) {
         draw.changeMode('draw_polygon');
         isDrawing = true;
         startBtn.style.display = 'none';
-        saveBtn.style.display = 'block';
+        saveBtn.style.display = 'flex';
     };
 
     const stopDrawing = (clear = true) => {
@@ -49,7 +49,7 @@ export function initializeExclusionDraw(map: Map) {
         }
         map.removeControl(draw);
         isDrawing = false;
-        startBtn.style.display = 'block';
+        startBtn.style.display = 'flex';
         saveBtn.style.display = 'none';
     };
 

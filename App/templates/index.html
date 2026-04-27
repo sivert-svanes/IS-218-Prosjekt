@@ -19,7 +19,6 @@
         <button onclick="selectMode('find-shelter')" style="display: block; width: 100%; padding: 12px; margin: 10px 0; font-size: 16px; cursor: pointer; border: none; background: #667eea; color: white; border-radius: 4px;">Finn tilfluktsrom</button>
         <button onclick="selectMode('logistics')" style="display: block; width: 100%; padding: 12px; margin: 10px 0; font-size: 16px; cursor: pointer; border: none; background: #667eea; color: white; border-radius: 4px;">Logistikk</button>
         <button onclick="selectMode('landsoversikt')" style="display: block; width: 100%; padding: 12px; margin: 10px 0; font-size: 16px; cursor: pointer; border: none; background: #667eea; color: white; border-radius: 4px;">Landsoversikt</button>
-        <button onclick="selectMode('add-exclusion')" style="display: block; width: 100%; padding: 12px; margin: 10px 0; font-size: 16px; cursor: pointer; border: none; background: #667eea; color: white; border-radius: 4px;">Legg til område</button>
       </div>
     </div>
 
@@ -48,7 +47,7 @@
         <span style="position: relative; z-index: 2;">✕</span>
       </div>
 
-      <div id="exclusion-draw-controls" style="display: none; align-items: stretch;">
+      <div id="exclusion-draw-controls" style="display: none;">
           <select id="exclusion-type-select" class="box text" style="background: rgba(15,25,30,0.5); color: #c2c8ca; border: none; border-radius: 0.25rem; margin: 0.25rem; padding: 0.25rem 0.5rem;"></select>
           <div class="box text prevent-select button" id="draw-start-btn">Tegn</div>
           <div class="box text prevent-select button" id="draw-save-btn" style="display: none;">Lagre</div>
@@ -78,20 +77,21 @@
     // Hide all mode-specific buttons
     document.getElementById('shortest-path-btn').style.display = 'none';
     document.getElementById('clear-path-btn').style.display = 'none';
+    const coverageBtn = document.getElementById('coverage-analysis-btn');
+    if (coverageBtn) coverageBtn.style.display = 'none';
+    document.getElementById('exclusion-draw-controls').style.display = 'none';
 
     // Show buttons based on mode
     if (mode === 'find-shelter') {
      window.triggerGeolocate();
-      document.getElementById('shortest-path-btn').style.display = 'block';
+      document.getElementById('shortest-path-btn').style.display = 'flex';
     } else if (mode === 'logistics') {
       window.triggerGeolocate();
       // No buttons for logistics
     } else if (mode === 'landsoversikt') {
       window.zoomToNorway();
-      document.getElementById('dekningsgrad-btn').style.display = 'block';
-
-    } else if (mode === 'add-exclusion') {
-        document.getElementById('exclusion-draw-controls').style.display = 'flex';
+      document.getElementById('coverage-analysis-btn').style.display = 'flex';
+      document.getElementById('exclusion-draw-controls').style.display = 'contents';
     }
   }
 
@@ -104,6 +104,8 @@
 
     document.getElementById('shortest-path-btn').style.display = 'none';
     document.getElementById('clear-path-btn').style.display = 'none';
+    const coverageBtn = document.getElementById('coverage-analysis-btn');
+    if (coverageBtn) coverageBtn.style.display = 'none';
     document.getElementById('exclusion-draw-controls').style.display = 'none';
     if (window.cancelDrawing) window.cancelDrawing();
   }

@@ -74,10 +74,9 @@ html, body {
 }
 
 .container {
-    display: grid;
-    grid-template-columns: auto auto auto auto auto auto;
+    display: flex;
+    flex-direction: row;
     padding: 0.25rem;
-    grid-gap: 0;
     max-width: max-content;
     align-items: stretch;
 }
