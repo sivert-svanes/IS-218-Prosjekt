@@ -5,6 +5,7 @@ import {
   AddDSBWmsLayers,
   AddVannOgVassdragLayers,
   AddFKBVeiLayer,
+  AddAmenityLayers,
 } from './layer.js'
 import {registerStyleInMenu, initializeDropdownMenus} from './layerControl.js'
 import {registerStyle} from "./mapStyles.js";
@@ -195,6 +196,7 @@ if (!maplibregl) {
     (async () => {
       await initializeExclusionZones(map);
       await AddShelterLayerGeospatial(map, fylkeIds);
+      await AddAmenityLayers(map);
       AddDSBWmsLayers(map);
       AddVannOgVassdragLayers(map);
       AddFKBVeiLayer(map);

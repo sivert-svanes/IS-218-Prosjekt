@@ -1,4 +1,15 @@
-﻿export enum ExclusionZoneType {
+﻿export enum AmenityType {
+  CONVENIENCE = 'convenience',
+  DOCTORS = 'doctors',
+  DRINKING_WATER = 'drinking_water',
+  HARDWARE = 'hardware',
+  SUPERMARKET = 'supermarket',
+  TRADE = 'trade',
+  HOSPITAL = 'hospital',
+  CHEMIST = 'chemist'
+}
+
+export enum ExclusionZoneType {
   'Flood Zone'        = 1,
   'Radiation Hazard'  = 2,
   'Biological Hazard' = 3,
@@ -10,6 +21,17 @@
 }
 
 //region Config
+export enum amenityColor {
+  'convenience' = '#FF9800',
+  'doctors' = '#E74C3C',
+  'drinking_water' = '#3498DB',
+  'hardware' = '#8E44AD',
+  'supermarket' = '#27AE60',
+  'trade' = '#F39C12',
+  'hospital' = '#C0392B',
+  'chemist' = '#2ECC71'
+}
+
 export enum exclusionZoneColor {
   'Flood Zone'        = '#0000ff',
   'Radiation Hazard'  = '#e1ca43',

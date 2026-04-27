@@ -476,3 +476,91 @@ def get_exclusion_zones(engine):
             "type": "FeatureCollection",
             "features": features
         }
+
+
+# Amenity types as defined in the request
+class AmenityType(Enum):
+    CONVENIENCE = "convenience"
+    DOCTORS = "doctors"
+    DRINKING_WATER = "drinking_water"
+    HARDWARE = "hardware"
+    SUPERMARKET = "supermarket"
+    TRADE = "trade"
+    HOSPITAL = "hospital"
+    CHEMIST = "chemist"
+
+
+def get_amenities_by_type(engine, amenity_type: str | AmenityType = None, amenity_types: list[str] = None):
+    """
+    Retrieve amenities from the database and return them organized by type as layers.
+
+    Args:
+        engine: SQLAlchemy engine instance
+        amenity_type: Optional single amenity type filter (e.g., 'convenience', 'doctors')
+        amenity_types: Optional list of amenity types to filter (e.g., ['convenience', 'doctors'])
+                     If neither amenity_type nor amenity_types is provided, returns all types.
+
+    Returns:
+        If amenity_type or amenity_types is specified:
+            A FeatureCollection for those types
+        If neither is specified:
+            A dictionary with layers for each amenity type
+    """
+
+    # Convert AmenityType enum to string if needed
+    if isinstance(amenity_type, AmenityType):
+        amenity_type = amenity_type.value
+
+    # Build the list of types to query
+    if amenity_types:
+        types_to_query = amenity_types
+    elif amenity_type:
+        types_to_query = [amenity_type]
+    else:
+        types_to_query = [e.value for e in AmenityType]
+
+    # Determine if organizing by type
+    organize_by_type = not (amenity_type or amenity_types)
+    order_by = "key, fid" if organize_by_type else "fid"
+
+    with engine.connect() as conn:
+        query = text(f"""
+            SELECT fid, key, ST_AsGeoJSON(wkt_geom::geometry) AS geojson
+            FROM public.buildings
+            WHERE key = ANY(:amenity_types)
+            ORDER BY {order_by};
+        """)
+        rows = conn.execute(query, {"amenity_types": types_to_query}).fetchall()
+
+        # If not organizing by type, return simple FeatureCollection
+        if not organize_by_type:
+            features = []
+            for row in rows:
+                try:
+                    feature = {
+                        "type": "Feature",
+                        "geometry": json.loads(row[2]),
+                        "properties": {"fid": int(row[0]), "type": row[1]}
+                    }
+                    features.append(feature)
+                except Exception as e:
+                    print(f"Error parsing amenity {row[0]}: {e}")
+            return {"type": "FeatureCollection", "features": features}
+
+        # Organize by type
+        layers = {e.value: {"type": "FeatureCollection", "features": []} for e in AmenityType}
+
+        for row in rows:
+            try:
+                amenity_type_str = row[1]
+                feature = {
+                    "type": "Feature",
+                    "geometry": json.loads(row[2]),
+                    "properties": {"fid": int(row[0]), "type": amenity_type_str}
+                }
+                if amenity_type_str in layers:
+                    layers[amenity_type_str]["features"].append(feature)
+            except Exception as e:
+                print(f"Error parsing amenity {row[0]}: {e}")
+
+        return layers
