@@ -69,6 +69,35 @@ export function initShelterDetailsModal(map: MaplibreGL.Map): void {
       // Build details HTML with inline amenity buttons
       const detailsHTML = Object.entries(data).map(([key, value]) => {
         let amenityButton = '';
+        let displayValue: string = 'N/A';
+
+        // Format the value based on its type and key
+        if (value !== null && value !== undefined && value !== '') {
+          // Format coordinates objects to show lat/lng
+          if (typeof value === 'object' && !Array.isArray(value)) {
+            const obj = value as Record<string, any>;
+            // Check for various coordinate property names
+            const lat = obj.lat || obj.latitude || obj.wgs84_north || obj.north || obj.y;
+            const lng = obj.lon || obj.longitude || obj.wgs84_east || obj.east || obj.x;
+
+            if (lat !== undefined && lng !== undefined) {
+              displayValue = `${parseFloat(lat).toFixed(6)}, ${parseFloat(lng).toFixed(6)}`;
+            } else if (obj.coordinates && Array.isArray(obj.coordinates) && obj.coordinates.length >= 2) {
+              // Handle GeoJSON-style coordinates [lng, lat]
+              displayValue = `${parseFloat(obj.coordinates[1]).toFixed(6)}, ${parseFloat(obj.coordinates[0]).toFixed(6)}`;
+            } else {
+              displayValue = String(value);
+            }
+          }
+          // Format percentages (multiply by 100)
+          else if (typeof value === 'number' && value >= 0 && value <= 1 && (key.toLowerCase().includes('prosent') || key.toLowerCase().includes('percent') || key.toLowerCase().includes('ratio') || key.toLowerCase().includes('utilization'))) {
+            displayValue = `${(value * 100).toFixed(1)}%`;
+          }
+          // Default formatting
+          else {
+            displayValue = String(value);
+          }
+        }
 
         // Check if this field matches any amenity button
         if (shelterLat !== null && shelterLng !== null) {
@@ -86,7 +115,7 @@ export function initShelterDetailsModal(map: MaplibreGL.Map): void {
         return `
           <div class="detail-row">
             <span class="detail-key">${key.toUpperCase().replace(/_/g, ' ')}:</span>
-            <span class="detail-value">${value ?? 'N/A'}${amenityButton}</span>
+            <span class="detail-value">${displayValue}${amenityButton}</span>
           </div>
         `;
       }).join('');
