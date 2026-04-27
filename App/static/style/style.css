@@ -75,7 +75,7 @@ html, body {
 
 .container {
     display: grid;
-    grid-template-columns: auto auto auto auto auto;
+    grid-template-columns: auto auto auto auto auto auto;
     padding: 0.25rem;
     grid-gap: 0;
     max-width: max-content;
@@ -294,6 +294,8 @@ html, body {
     outline: 2px solid rgba(15,25,30,0.65);
     box-shadow: 0 4px 12px rgba(15,25,30,0.35);
     display: none;
+    -webkit-backdrop-filter: blur(0.5rem);
+    backdrop-filter: blur(0.1rem);
 }
 
 .coverage-panel.is-open {
@@ -367,6 +369,8 @@ html, body {
     outline: 2px solid rgba(15,25,30,0.65);
     box-shadow: 0 4px 12px rgba(15,25,30,0.35);
     display: none;
+    -webkit-backdrop-filter: blur(0.5rem);
+    backdrop-filter: blur(0.1rem);
 }
 
 .coverage-result-box.is-visible {

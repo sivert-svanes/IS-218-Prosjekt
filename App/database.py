@@ -358,7 +358,7 @@ def calculate_coverage_analysis(shelters, population_cells):
     return result
 
 def get_cache_key(scope: str, fylke_id: int | None = None):
-    return f"{scope}_{fylke_id}_v3"
+    return f"{scope}_{fylke_id}_v5"
 
 
 def save_coverage_cache():
@@ -370,7 +370,7 @@ def save_coverage_cache():
 
 
 def get_coverage_analysis(engine, scope: str, fylke_id: int | None = None):
-    include_geometry = (scope != 'norway')
+    include_geometry = True
     cache_key = get_cache_key(scope, fylke_id)
 
     if cache_key in _coverage_analysis_cache:
