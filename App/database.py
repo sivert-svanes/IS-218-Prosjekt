@@ -130,6 +130,53 @@ def get_k_nearest_shelters(engine, lat: float, lng: float, k: int = 10):
         return row[0] if row else {"type": "FeatureCollection", "features": []}
 
 
+def get_k_nearest_buildings(engine, lat: float, lng: float, building_key: str, k: int = 10):
+    """Get k nearest buildings of a specific type/key.
+
+    Args:
+        engine: Database engine
+        lat: Latitude (WGS84 EPSG:4326)
+        lng: Longitude (WGS84 EPSG:4326)
+        building_key: Building type key (e.g., 'convenience', 'doctors', etc.)
+        k: Number of nearest buildings to return (default 10, max 50)
+
+    Returns:
+        GeoJSON FeatureCollection with k nearest buildings and their distances
+    """
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT json_build_object(
+                'type', 'FeatureCollection',
+                'features', COALESCE(json_agg(
+                    json_build_object(
+                        'type', 'Feature',
+                        'geometry', ST_AsGeoJSON(ST_SetSRID(t.wkt_geom::geometry, 4326))::json,
+                        'properties', json_build_object(
+                            'fid', t.fid,
+                            'key', t.key,
+                            'distance_km', ROUND((t.dist_m / 1000.0)::numeric, 2)
+                        )
+                    ) ORDER BY t.dist_m
+                ), '[]'::json)
+            )
+            FROM (
+                SELECT 
+                    fid,
+                    key,
+                    wkt_geom,
+                    ST_Distance(ST_SetSRID(wkt_geom::geometry, 4326), ST_SetSRID(ST_Point(:lng, :lat), 4326)) as dist_m
+                FROM public.buildings
+                WHERE key = :building_key
+                ORDER BY ST_SetSRID(wkt_geom::geometry, 4326) <-> ST_SetSRID(ST_Point(:lng, :lat), 4326)
+                LIMIT LEAST(GREATEST(:k, 1), 50)
+            ) t;
+        """), {"lat": lat, "lng": lng, "building_key": building_key, "k": k})
+
+        row = result.fetchone()
+        return row[0] if row else {"type": "FeatureCollection", "features": []}
+
+
+
 def get_fylker(engine):
     with engine.connect() as conn:
         rows = conn.execute(text("""
