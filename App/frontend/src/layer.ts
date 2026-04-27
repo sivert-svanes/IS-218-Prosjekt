@@ -7,6 +7,7 @@ import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId } from './interfac
 import { calculateBounds, buildEnumMapping, buildColorMapping, buildPatternConfig } from './utils.js';
 import { ExclusionZoneType, exclusionZoneColor, exclusionZonePattern } from './enum.js';
 import { buildPatternMapping } from './patterns.js';
+import { amenityLabels} from "./shelterDetails.js";
 
 const maplibregl = window.maplibregl;
 
@@ -75,7 +76,7 @@ function createBuildingPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature<GeoJS
   const html = `
     <div style="font-family: sans-serif; max-width: 260px;">
       <h3 style="margin: 0 0 6px 0; font-size: 14px;">Destinasjon</h3>
-      ${props.key ? `<p style="margin: 2px 0;"><strong>Type:</strong> ${props.key}</p>` : ''}
+      ${props.key ? `<p style="margin: 2px 0;"><strong>Type:</strong> ${amenityLabels[props.key]}</p>` : ''}
       ${props.distance_km ? `<p style="margin: 2px 0;"><strong>Avstand:</strong> ${props.distance_km} km</p>` : ''}
       <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
     </div>`;
@@ -530,17 +531,8 @@ export async function AddAmenityLayers(
   const typesToLoad = amenityTypes || Object.values(AmenityType);
   const layerVisibility = visible ? 'visible' : 'none';
 
-  // Friendly display names for amenity types
-  const amenityLabels: Record<string, string> = {
-    'convenience': 'Convenience Store',
-    'doctors': 'Doctors clinic',
-    'drinking_water': 'Drinking Water',
-    'hardware': 'Hardware Store',
-    'supermarket': 'Supermarket',
-    'trade': 'Trade Store',
-    'hospital': 'Hospital',
-    'chemist': 'Pharmacy',
-  };
+
+
 
   for (const amenityType of typesToLoad) {
     try {
