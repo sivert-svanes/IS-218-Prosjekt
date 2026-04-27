@@ -127,6 +127,14 @@ def api_coverage_analysis():
         engine = database.create_engine()
         result = database.get_coverage_analysis(engine, analysis_scope, fylke_id)
         s = result['summary']
+
+        fylke_name = None
+        if fylke_id is not None:
+            fylker = database.get_fylker(engine)
+            match = next((f for f in fylker if f["id"] == fylke_id), None)
+            if match:
+                fylke_name = match["navn"]
+
         response = {
             "summary": {
                 "total_population": int(s.get("total_population", 0)),
@@ -137,7 +145,9 @@ def api_coverage_analysis():
                 "coverage_ratio": float(s.get("coverage_ratio", 0.0)),
             },
             "shelters": result.get("shelters", {"type": "FeatureCollection", "features": []}),
+            "fylke_name": fylke_name,
         }
+
         if "population_cells" in result:
             response["population_cells"] = result["population_cells"]
         return flask.jsonify(response)
@@ -145,6 +155,24 @@ def api_coverage_analysis():
         print(f"Coverage analysis failed: {e}")
         traceback.print_exc()
         return flask.jsonify({"error": "Coverage analysis failed"}), 500
+
+@app.route('/api/fylke-outline/<int:fylke_id>')
+def api_fylke_outline(fylke_id):
+    try:
+        engine = database.create_engine()
+        data = database.get_fylke_outline(engine, fylke_id)
+        if not data:
+            return flask.jsonify({"error": "Fylke not found"}), 404
+        return flask.jsonify({
+            "type": "Feature",
+            "geometry": data["geojson"],
+            "properties": {"fylke_id": fylke_id, "navn": data["navn"]},
+        })
+    except Exception as e:
+        print(f"Fylke outline failed: {e}")
+        traceback.print_exc()
+        return flask.jsonify({"error": "Could not fetch fylke outline"}), 500
+
 
 @app.route('/api/valhalla-route', methods=['POST'])
 def valhalla_route():
