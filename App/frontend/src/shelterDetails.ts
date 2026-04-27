@@ -41,17 +41,25 @@ export function initShelterDetailsModal(map: MaplibreGL.Map): void {
         [shelterLng, shelterLat] = feature.geometry.coordinates;
       }
 
-      // Build details HTML
+      // Build details HTML with inline water button for water-related fields
       const detailsHTML = Object.entries(data).map(([key, value]) => {
+        // Check if this is a water-related field
+        const isWaterField = key.toLowerCase().includes('vann') || key.toLowerCase().includes('water');
+
+        const waterButton = isWaterField && shelterLat !== null && shelterLng !== null
+          ? `<button class="route-button" data-building-key="drinking_water" data-shelter-lat="${shelterLat}" data-shelter-lng="${shelterLng}"
+ title="Finn rute til nærmeste vann">Find water</button>`
+          : '';
+
         return `
           <div class="detail-row">
             <span class="detail-key">${key.toUpperCase().replace(/_/g, ' ')}:</span>
-            <span class="detail-value">${value ?? 'N/A'}</span>
+            <span class="detail-value">${value ?? 'N/A'}${waterButton}</span>
           </div>
         `;
       }).join('');
 
-      // Add a route-to-water button if we have coordinates
+      // ...existing code...
       const routeToWaterButton = shelterLat !== null && shelterLng !== null
         ? `
           <div class="detail-row detail-row-action">
@@ -67,7 +75,7 @@ export function initShelterDetailsModal(map: MaplibreGL.Map): void {
           <button class="modal-close" onclick="window.closeShelterDetailsModal()">&times;</button>
           <h2>${data.romnr || 'Tilfluktsrom'}</h2>
           <div class="modal-details">
-            ${detailsHTML}${routeToWaterButton}
+            ${detailsHTML}
           </div>
         </div>
       `;
