@@ -471,3 +471,108 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
     return this;
   };
 }
+
+/**
+ * Adds amenity layers to the map for each amenity type.
+ * Supports displaying convenience stores, doctors, drinking water, hardware, supermarkets, and trade facilities.
+ * @param map The MapLibre map instance
+ * @param amenityTypes Optional array of specific amenity types to load. If not provided, loads all types.
+ * @param visible Controls if the layers are displayed once they've been loaded
+ */
+export async function AddAmenityLayers(
+  map: MaplibreGL.Map,
+  amenityTypes?: string[],
+  visible: boolean = false
+): Promise<void> {
+  const { AmenityType, amenityColor } = await import('./enum.js');
+
+  // Use all types if not specified
+  const typesToLoad = amenityTypes || Object.values(AmenityType);
+  const layerVisibility = visible ? 'visible' : 'none';
+
+  // Friendly display names for amenity types
+  const amenityLabels: Record<string, string> = {
+    'convenience': 'Convenience Store',
+    'doctors': 'Doctor',
+    'drinking_water': 'Drinking Water',
+    'hardware': 'Hardware Stores',
+    'supermarket': 'Supermarket',
+    'trade': 'Trade Store',
+    'hospital': 'Hospital'
+  };
+
+  for (const amenityType of typesToLoad) {
+    try {
+      const res = await fetch(`/api/amenities/${amenityType}`);
+      const geojson = await res.json();
+
+      if (!geojson.features || geojson.features.length === 0) {
+        console.warn(`No amenities found for type: ${amenityType}`);
+        continue;
+      }
+
+      const sourceId = `amenity-source-${amenityType}`;
+      const layerId = `amenity-layer-${amenityType}`;
+      const label = amenityLabels[amenityType] || amenityType;
+
+      // Get color for this amenity type
+      const color = (amenityColor as Record<string, string>)[amenityType] || '#808080';
+
+      // Add the source
+      map.addSource(sourceId, { type: 'geojson', data: geojson });
+
+      // Add the layer
+      map.addLayer({
+        id: layerId,
+        type: 'circle',
+        source: sourceId,
+        paint: {
+          'circle-radius': 5,
+          'circle-color': color,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#ffffff',
+          'circle-opacity': 0.8,
+        },
+        layout: { visibility: layerVisibility },
+      });
+
+      // Create popup on click
+      map.on('click', layerId, (e) => {
+        if (!e.features || e.features.length === 0) return;
+        const feature = e.features[0];
+        const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
+        const props = feature.properties || {} as Record<string, string>;
+
+        const html = `
+          <div style="font-family: sans-serif; max-width: 200px;">
+            <h3 style="margin: 0 0 6px 0; font-size: 14px;">${label}</h3>
+            <p style="margin: 2px 0;"><strong>Type:</strong> ${props.type || 'Unknown'}</p>
+            <p style="margin: 2px 0;"><strong>Coordinates:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
+          </div>`;
+
+        // Handle date line wrapping if needed
+        if (e.lngLat) {
+          while (Math.abs(e.lngLat.lng - coords[0]) > 180) {
+            coords[0] += e.lngLat.lng > coords[0] ? 360 : -360;
+          }
+        }
+
+        if (maplibregl) {
+          new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
+        }
+      });
+
+      // Change cursor on hover
+      map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+
+      // Register the layer in the layer control
+      registerLayer(layerId, label, visible, map);
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+    } catch (err) {
+      console.error(`Failed to load amenities for type ${amenityType}:`, err);
+    }
+  }
+}

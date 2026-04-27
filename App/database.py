@@ -476,3 +476,134 @@ def get_exclusion_zones(engine):
             "type": "FeatureCollection",
             "features": features
         }
+
+
+# Amenity types as defined in the request
+class AmenityType(Enum):
+    CONVENIENCE = "convenience"
+    DOCTORS = "doctors"
+    DRINKING_WATER = "drinking_water"
+    HARDWARE = "hardware"
+    SUPERMARKET = "supermarket"
+    TRADE = "trade"
+    HOSPITAL = "hospital"
+
+
+def get_amenities_by_type(engine, amenity_type: str | AmenityType = None, amenity_types: list[str] = None):
+    """
+    Retrieve amenities from the database and return them organized by type as layers.
+
+    Args:
+        engine: SQLAlchemy engine instance
+        amenity_type: Optional single amenity type filter (e.g., 'convenience', 'doctors')
+        amenity_types: Optional list of amenity types to filter (e.g., ['convenience', 'doctors'])
+                     If neither amenity_type nor amenity_types is provided, returns all types.
+
+    Returns:
+        If amenity_type or amenity_types is specified:
+            A FeatureCollection for those types
+        If neither is specified:
+            A dictionary with layers for each amenity type:
+            {
+                "convenience": FeatureCollection,
+                "doctors": FeatureCollection,
+                "drinking_water": FeatureCollection,
+                "hardware": FeatureCollection,
+                "supermarket": FeatureCollection,
+                "trade": FeatureCollection
+            }
+    """
+
+    # Convert AmenityType enum to string if needed
+    if isinstance(amenity_type, AmenityType):
+        amenity_type = amenity_type.value
+
+    # Build the list of types to query
+    types_to_query = None
+    if amenity_types:
+        types_to_query = amenity_types
+    elif amenity_type:
+        types_to_query = [amenity_type]
+    else:
+        types_to_query = list(AmenityType)
+
+    with engine.connect() as conn:
+        if amenity_type or amenity_types:
+            # Get specific amenity type(s) as single FeatureCollection
+            query = text("""
+                SELECT 
+                    fid,
+                    key,
+                    ST_AsGeoJSON(wkt_geom::geometry) AS geojson
+                FROM public.buildings
+                WHERE key = ANY(:amenity_types)
+                ORDER BY fid;
+            """)
+            rows = conn.execute(query, {"amenity_types": types_to_query}).fetchall()
+
+            features = []
+            for row in rows:
+                try:
+                    geojson = json.loads(row[2])
+                    feature = {
+                        "type": "Feature",
+                        "geometry": geojson,
+                        "properties": {
+                            "fid": int(row[0]),
+                            "type": row[1]
+                        }
+                    }
+                    features.append(feature)
+                except Exception as e:
+                    print(f"Error parsing amenity {row[0]}: {e}")
+                    continue
+
+            return {
+                "type": "FeatureCollection",
+                "features": features
+            }
+        else:
+            # Get all amenities organized by type
+            query = text("""
+                SELECT 
+                    fid,
+                    key,
+                    ST_AsGeoJSON(wkt_geom::geometry) AS geojson
+                FROM public.buildings
+                WHERE key = ANY(:amenity_types)
+                ORDER BY key, fid;
+            """)
+            rows = conn.execute(query, {"amenity_types": types_to_query}).fetchall()
+
+            layers = {
+                "convenience": {"type": "FeatureCollection", "features": []},
+                "doctors": {"type": "FeatureCollection", "features": []},
+                "drinking_water": {"type": "FeatureCollection", "features": []},
+                "hardware": {"type": "FeatureCollection", "features": []},
+                "supermarket": {"type": "FeatureCollection", "features": []},
+                "trade": {"type": "FeatureCollection", "features": []}
+            }
+
+            for row in rows:
+                try:
+                    geojson = json.loads(row[2])
+                    amenity_type_str = row[1]
+
+                    feature = {
+                        "type": "Feature",
+                        "geometry": geojson,
+                        "properties": {
+                            "fid": int(row[0]),
+                            "type": amenity_type_str
+                        }
+                    }
+
+                    if amenity_type_str in layers:
+                        layers[amenity_type_str]["features"].append(feature)
+                except Exception as e:
+                    print(f"Error parsing amenity {row[0]}: {e}")
+                    continue
+
+            return layers
+
+print(get_amenities_by_type(create_engine(), AmenityType.CONVENIENCE))

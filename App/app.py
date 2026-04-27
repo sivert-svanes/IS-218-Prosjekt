@@ -283,6 +283,57 @@ def api_exclusion_zones():
         traceback.print_exc()
         return flask.jsonify({"type": "FeatureCollection", "features": []})
 
+@app.route('/api/amenities')
+def api_amenities():
+    """Get amenities by type as GeoJSON FeatureCollection(s).
+
+    Query parameters:
+        type: Optional single amenity type (e.g., 'convenience', 'doctors')
+        types: Optional comma-separated list of amenity types
+        organized: If true, returns dictionary with layers for each type (default: false)
+    """
+    amenity_type = flask.request.args.get('type', '').strip()
+    amenity_types_param = flask.request.args.get('types', '').strip()
+    organized = flask.request.args.get('organized', 'false').lower() == 'true'
+
+    amenity_types = None
+    if amenity_types_param:
+        amenity_types = [t.strip() for t in amenity_types_param.split(',') if t.strip()]
+    elif amenity_type:
+        amenity_types = [amenity_type]
+
+    try:
+        engine = database.create_engine()
+
+        if organized and not amenity_type and not amenity_types_param:
+            # Return organized by type
+            geojson = database.get_amenities_by_type(engine)
+        else:
+            # Return single FeatureCollection
+            geojson = database.get_amenities_by_type(engine, amenity_type=amenity_type, amenity_types=amenity_types)
+
+        return flask.jsonify(geojson)
+    except Exception as e:
+        print(f"Error fetching amenities: {e}")
+        traceback.print_exc()
+        return flask.jsonify({"type": "FeatureCollection", "features": []})
+
+@app.route('/api/amenities/<amenity_type>')
+def api_amenities_by_type(amenity_type):
+    """Get amenities of a specific type as GeoJSON FeatureCollection.
+
+    Args:
+        amenity_type: The amenity type (e.g., 'convenience', 'doctors', 'drinking_water', 'hardware', 'supermarket', 'trade')
+    """
+    try:
+        engine = database.create_engine()
+        geojson = database.get_amenities_by_type(engine, amenity_type=amenity_type)
+        return flask.jsonify(geojson)
+    except Exception as e:
+        print(f"Error fetching amenities of type {amenity_type}: {e}")
+        traceback.print_exc()
+        return flask.jsonify({"type": "FeatureCollection", "features": []})
+
 @app.route('/api/nvdb/roads')
 def api_nvdb_roads():
     """Fetch NVDB road segments as GeoJSON from PostGIS.
