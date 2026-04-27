@@ -478,7 +478,7 @@ def get_exclusion_zones(engine):
         }
 
 
-<<<<<<< HEAD
+
 def get_shelter_details(engine, fid: int):
     """Fetch detailed information for a specific shelter by fid.
 
@@ -500,7 +500,7 @@ def get_shelter_details(engine, fid: int):
             return row[0]
         return None
 
-=======
+
 # Amenity types as defined in the request
 class AmenityType(Enum):
     CONVENIENCE = "convenience"
@@ -587,4 +587,3 @@ def get_amenities_by_type(engine, amenity_type: str | AmenityType = None, amenit
                 print(f"Error parsing amenity {row[0]}: {e}")
 
         return layers
->>>>>>> main
