@@ -12,9 +12,11 @@ import {registerStyle} from "./mapStyles.js";
 import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
 import { initializeExclusionZones } from './exclusion.js'
 import { initializeCoverageAnalysis } from './coverageAnalysis.js'
+import { initShelterDetailsModal } from './shelterDetails.js';
 import { getMapStyle, GLOBE_FADE_CONFIG, DARK_PAINTS } from './mapStyles.js';
 import './interfaces.js';
 
+// MapLibre GL constants and utilities
 const maplibregl = window.maplibregl;
 if (!maplibregl) {
   console.warn('MapLibre GL not found on window as maplibregl');
@@ -200,6 +202,9 @@ if (!maplibregl) {
       AddDSBWmsLayers(map);
       AddVannOgVassdragLayers(map);
       AddFKBVeiLayer(map);
+
+      // Initialize shelter details modal functionality
+      initShelterDetailsModal(map);
     })().catch(err => console.error('Error loading layers:', err));
   });
 }

@@ -1,12 +1,13 @@
 ﻿import os
-import json
 import math
+import json
+
+import numpy as np
 import sqlalchemy
 from sqlalchemy import text
 from sqlalchemy.pool import QueuePool
 from dotenv import load_dotenv
 from enum import Enum
-import numpy as np
 
 load_dotenv()
 CONN_STR = os.getenv("DATABASE_URL")
@@ -127,6 +128,56 @@ def get_k_nearest_shelters(engine, lat: float, lng: float, k: int = 10):
         """), {"lat": lat, "lng": lng, "k": k})
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
+
+
+def get_k_nearest_buildings(engine, lat: float, lng: float, building_key: str, k: int = 10):
+    """Get k nearest buildings of a specific type/key or multiple keys.
+
+    Args:
+        engine: Database engine
+        lat: Latitude (WGS84 EPSG:4326)
+        lng: Longitude (WGS84 EPSG:4326)
+        building_key: Building type key(s) - can be single key or comma-separated keys (e.g., 'water' or 'trade,hardware')
+        k: Number of nearest buildings to return per key (default 10, max 50)
+
+    Returns:
+        GeoJSON FeatureCollection with k nearest buildings per key and their distances
+    """
+    # Parse building keys (handle both single and multiple keys)
+    keys = [k.strip() for k in building_key.split(',')] if ',' in building_key else [building_key]
+
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            SELECT json_build_object(
+                'type', 'FeatureCollection',
+                'features', COALESCE(json_agg(
+                    json_build_object(
+                        'type', 'Feature',
+                        'geometry', ST_AsGeoJSON(ST_SetSRID(t.wkt_geom::geometry, 4326))::json,
+                        'properties', json_build_object(
+                            'fid', t.fid,
+                            'key', t.key,
+                            'distance_km', ROUND((t.dist_m / 1000.0)::numeric, 2)
+                        )
+                    ) ORDER BY t.key, t.dist_m
+                ), '[]'::json)
+            )
+            FROM (
+                SELECT 
+                    fid,
+                    key,
+                    wkt_geom,
+                    ST_Distance(ST_SetSRID(wkt_geom::geometry, 4326), ST_SetSRID(ST_Point(:lng, :lat), 4326)) as dist_m,
+                    ROW_NUMBER() OVER (PARTITION BY key ORDER BY ST_SetSRID(wkt_geom::geometry, 4326) <-> ST_SetSRID(ST_Point(:lng, :lat), 4326)) as rn
+                FROM public.buildings
+                WHERE key = ANY(:building_keys)
+            ) t
+            WHERE t.rn <= LEAST(GREATEST(:k, 1), 50);
+        """), {"lat": lat, "lng": lng, "building_keys": keys, "k": k})
+
+        row = result.fetchone()
+        return row[0] if row else {"type": "FeatureCollection", "features": []}
+
 
 
 def get_fylker(engine):
@@ -476,6 +527,29 @@ def get_exclusion_zones(engine):
             "type": "FeatureCollection",
             "features": features
         }
+
+
+def get_shelter_details(engine, fid: int):
+    """Fetch detailed information for a specific shelter by fid.
+
+    Args:
+        engine: Database engine
+        fid: Shelter ID (fid) to fetch details for
+
+    Returns:
+        Dictionary with shelter details from database, or None if not found
+    """
+    with engine.connect() as conn:
+        # Call the database procedure to get shelter details
+        result = conn.execute(text("""
+            SELECT get_shelter_details(:fid);
+        """), {"fid": fid})
+        row = result.fetchone()
+
+        if row and row[0]:
+            return row[0]
+        return None
+
 
 
 # Amenity types as defined in the request

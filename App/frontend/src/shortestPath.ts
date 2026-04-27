@@ -19,6 +19,22 @@ async function findNearestShelters(lat: number, lng: number, k: number = NUM_SHE
   }
 }
 
+async function findNearestBuildings(lat: number, lng: number, buildingKey: string, k: number = 15): Promise<any[]> {
+  try {
+    const params = new URLSearchParams({
+      lat: lat.toString(),
+      lng: lng.toString(),
+      building_key: buildingKey,
+      k: k.toString()
+    });
+    const response = await fetch(`/api/nearest-buildings?${params.toString()}`);
+    return response.ok ? (await response.json()).features || [] : [];
+  } catch (err) {
+    console.error('Failed to fetch nearest buildings:', err);
+    return [];
+  }
+}
+
 async function getShortestShelterViaMatrix(userLng: number, userLat: number, shelters: any[]): Promise<{ shelter: any; distance: number; index: number } | null> {
   if (shelters.length === 0) return null;
 
@@ -183,6 +199,51 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
     AddShortestPathLayer(map, pathCoords, shortestShelter.properties?.fylke_id, shelterFeature);
   } catch (err) {
     console.error('Shortest path error:', err);
+  }
+}
+
+export async function calculateAndDisplayPathToBuilding(map: MaplibreGL.Map, shelterLat: number, shelterLng: number, buildingKey: string): Promise<void> {
+  try {
+    console.log(`Fetching nearest ${buildingKey} buildings...`);
+    const buildings = await findNearestBuildings(shelterLat, shelterLng, buildingKey, 15);
+
+    if (!buildings.length) {
+      console.warn(`No ${buildingKey} buildings found`);
+      return;
+    }
+
+    console.log(`Found ${buildings.length} buildings for keys: ${buildingKey}`, buildings);
+
+    // Use Matrix API to find the shortest path from shelter to buildings
+    const shortestResult = await getShortestShelterViaMatrix(shelterLng, shelterLat, buildings);
+    if (!shortestResult) {
+      console.warn(`No valid routes found to any ${buildingKey}`);
+      return;
+    }
+
+    const { shelter: nearestBuilding } = shortestResult;
+    const [buildingLng, buildingLat] = nearestBuilding.geometry.coordinates;
+
+    // Fetch the actual route with polyline for display
+    const route = await getRoute(shelterLng, shelterLat, buildingLng, buildingLat);
+    if (!route) {
+      console.warn(`Failed to fetch route to nearest ${buildingKey}`);
+      return;
+    }
+
+    const shape = route.shape || route.legs?.[0]?.shape;
+    if (!shape) return console.warn('No shape found in route');
+
+    const pathCoords = decodePolyline6(shape);
+    if (pathCoords.length < 2) return console.warn('Not enough coordinates:', pathCoords.length);
+
+    const buildingFeature: ShelterFeature = nearestBuilding.type === 'Feature'
+      ? (nearestBuilding as ShelterFeature)
+      : { type: 'Feature', geometry: nearestBuilding.geometry as GeoJSON.Point, properties: nearestBuilding.properties || {} } as ShelterFeature;
+
+    AddShortestPathLayer(map, pathCoords, undefined, buildingFeature);
+  } catch (err) {
+    console.error(`Error routing to ${buildingKey}:`, err);
   }
 }
 
