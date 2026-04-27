@@ -5,7 +5,8 @@
   HARDWARE = 'hardware',
   SUPERMARKET = 'supermarket',
   TRADE = 'trade',
-  HOSPITAL = 'hospital'
+  HOSPITAL = 'hospital',
+  CHEMIST = 'chemist'
 }
 
 export enum ExclusionZoneType {
@@ -27,7 +28,8 @@ export enum amenityColor {
   'hardware' = '#8E44AD',
   'supermarket' = '#27AE60',
   'trade' = '#F39C12',
-  'hospital' = '#C0392B'
+  'hospital' = '#C0392B',
+  'chemist' = '#2ECC71'
 }
 
 export enum exclusionZoneColor {

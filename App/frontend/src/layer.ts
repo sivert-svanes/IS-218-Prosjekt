@@ -493,12 +493,13 @@ export async function AddAmenityLayers(
   // Friendly display names for amenity types
   const amenityLabels: Record<string, string> = {
     'convenience': 'Convenience Store',
-    'doctors': 'Doctor',
+    'doctors': 'Doctors clinic',
     'drinking_water': 'Drinking Water',
-    'hardware': 'Hardware Stores',
+    'hardware': 'Hardware Store',
     'supermarket': 'Supermarket',
     'trade': 'Trade Store',
-    'hospital': 'Hospital'
+    'hospital': 'Hospital',
+    'chemist': 'Pharmacy',
   };
 
   for (const amenityType of typesToLoad) {
