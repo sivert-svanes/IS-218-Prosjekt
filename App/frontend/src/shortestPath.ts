@@ -21,7 +21,13 @@ async function findNearestShelters(lat: number, lng: number, k: number = NUM_SHE
 
 async function findNearestBuildings(lat: number, lng: number, buildingKey: string, k: number = 15): Promise<any[]> {
   try {
-    const response = await fetch(`/api/nearest-buildings?lat=${lat}&lng=${lng}&building_key=${buildingKey}&k=${k}`);
+    const params = new URLSearchParams({
+      lat: lat.toString(),
+      lng: lng.toString(),
+      building_key: buildingKey,
+      k: k.toString()
+    });
+    const response = await fetch(`/api/nearest-buildings?${params.toString()}`);
     return response.ok ? (await response.json()).features || [] : [];
   } catch (err) {
     console.error('Failed to fetch nearest buildings:', err);
@@ -198,11 +204,15 @@ export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, 
 
 export async function calculateAndDisplayPathToBuilding(map: MaplibreGL.Map, shelterLat: number, shelterLng: number, buildingKey: string): Promise<void> {
   try {
+    console.log(`Fetching nearest ${buildingKey} buildings...`);
     const buildings = await findNearestBuildings(shelterLat, shelterLng, buildingKey, 15);
+
     if (!buildings.length) {
       console.warn(`No ${buildingKey} buildings found`);
       return;
     }
+
+    console.log(`Found ${buildings.length} buildings for keys: ${buildingKey}`, buildings);
 
     // Use Matrix API to find the shortest path from shelter to buildings
     const shortestResult = await getShortestShelterViaMatrix(shelterLng, shelterLat, buildings);

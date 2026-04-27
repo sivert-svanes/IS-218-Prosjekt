@@ -11,6 +11,31 @@ export const amenityLabels: Record<string, string> = {
     'chemist': 'Pharmacy',
   };
 
+/**
+ * Amenity button configurations with their field patterns and building keys
+ */
+export const amenityButtons: Record<string, { fields: string[], keys: string[], icon: string }> = {
+  water: {
+    fields: ['vann', 'water'],
+    keys: ['water'],
+    icon: 'Find Water'
+  },
+  food: {
+    fields: ['mat', 'food', 'provisions'],
+    keys: ['convenience', 'supermarket'],
+    icon: 'Find Food'
+  },
+  equipment: {
+    fields: ['utstyr', 'equipment', 'tools'],
+    keys: ['trade', 'hardware'],
+    icon: 'Find Equipment'
+  },
+  medicine: {
+    fields: ['medisin', 'medicine', 'health'],
+    keys: ['hospital', 'chemist', 'doctors'],
+    icon: 'Find Medicine'
+  }
+};
 
 /**
  * Initialize shelter details modal functionality
@@ -41,34 +66,30 @@ export function initShelterDetailsModal(map: MaplibreGL.Map): void {
         [shelterLng, shelterLat] = feature.geometry.coordinates;
       }
 
-      // Build details HTML with inline water button for water-related fields
+      // Build details HTML with inline amenity buttons
       const detailsHTML = Object.entries(data).map(([key, value]) => {
-        // Check if this is a water-related field
-        const isWaterField = key.toLowerCase().includes('vann') || key.toLowerCase().includes('water');
+        let amenityButton = '';
 
-        const waterButton = isWaterField && shelterLat !== null && shelterLng !== null
-          ? `<button class="route-button" data-building-key="drinking_water" data-shelter-lat="${shelterLat}" data-shelter-lng="${shelterLng}"
- title="Finn rute til nærmeste vann">Find water</button>`
-          : '';
+        // Check if this field matches any amenity button
+        if (shelterLat !== null && shelterLng !== null) {
+          const fieldLower = key.toLowerCase();
+
+          for (const [amenityKey, amenityConfig] of Object.entries(amenityButtons)) {
+            if (amenityConfig.fields.some(field => fieldLower.includes(field))) {
+              // Create buttons for all keys in this amenity (comma-separated)
+              amenityButton = `<button class="route-button" data-building-keys="${amenityConfig.keys.join(',')}" data-shelter-lat="${shelterLat}" data-shelter-lng="${shelterLng}" title="Finn nærmeste ${amenityKey}">${amenityConfig.icon}</button>`;
+              break;
+            }
+          }
+        }
 
         return `
           <div class="detail-row">
             <span class="detail-key">${key.toUpperCase().replace(/_/g, ' ')}:</span>
-            <span class="detail-value">${value ?? 'N/A'}${waterButton}</span>
+            <span class="detail-value">${value ?? 'N/A'}${amenityButton}</span>
           </div>
         `;
       }).join('');
-
-      // ...existing code...
-      const routeToWaterButton = shelterLat !== null && shelterLng !== null
-        ? `
-          <div class="detail-row detail-row-action">
-            <button class="route-button" data-building-key="drinking_water" data-shelter-lat="${shelterLat}" data-shelter-lng="${shelterLng}" title="Finn rute til nærmeste vann">
-              Route to water
-            </button>
-          </div>
-        `
-        : '';
 
       modalContent.innerHTML = `
         <div class="modal-content">
@@ -86,14 +107,16 @@ export function initShelterDetailsModal(map: MaplibreGL.Map): void {
       modalContent.querySelectorAll('.route-button').forEach((button: Element) => {
         button.addEventListener('click', async (e: Event) => {
           e.preventDefault();
-          const buildingKey = (button as HTMLElement).getAttribute('data-building-key');
+          const buildingKeysStr = (button as HTMLElement).getAttribute('data-building-keys');
           const lat = parseFloat((button as HTMLElement).getAttribute('data-shelter-lat') || '0');
           const lng = parseFloat((button as HTMLElement).getAttribute('data-shelter-lng') || '0');
 
-          if (!isNaN(lat) && !isNaN(lng)) {
+          if (!isNaN(lat) && !isNaN(lng) && buildingKeysStr) {
             const { calculateAndDisplayPathToBuilding, clearPath } = await import('./shortestPath.js');
             clearPath(map);
-            await calculateAndDisplayPathToBuilding(map, lat, lng, buildingKey || '');
+
+            // Pass comma-separated keys directly - the backend will return k results for each key
+            await calculateAndDisplayPathToBuilding(map, lat, lng, buildingKeysStr);
           }
         });
       });

@@ -131,18 +131,21 @@ def get_k_nearest_shelters(engine, lat: float, lng: float, k: int = 10):
 
 
 def get_k_nearest_buildings(engine, lat: float, lng: float, building_key: str, k: int = 10):
-    """Get k nearest buildings of a specific type/key.
+    """Get k nearest buildings of a specific type/key or multiple keys.
 
     Args:
         engine: Database engine
         lat: Latitude (WGS84 EPSG:4326)
         lng: Longitude (WGS84 EPSG:4326)
-        building_key: Building type key (e.g., 'convenience', 'doctors', etc.)
-        k: Number of nearest buildings to return (default 10, max 50)
+        building_key: Building type key(s) - can be single key or comma-separated keys (e.g., 'water' or 'trade,hardware')
+        k: Number of nearest buildings to return per key (default 10, max 50)
 
     Returns:
-        GeoJSON FeatureCollection with k nearest buildings and their distances
+        GeoJSON FeatureCollection with k nearest buildings per key and their distances
     """
+    # Parse building keys (handle both single and multiple keys)
+    keys = [k.strip() for k in building_key.split(',')] if ',' in building_key else [building_key]
+
     with engine.connect() as conn:
         result = conn.execute(text("""
             SELECT json_build_object(
@@ -156,7 +159,7 @@ def get_k_nearest_buildings(engine, lat: float, lng: float, building_key: str, k
                             'key', t.key,
                             'distance_km', ROUND((t.dist_m / 1000.0)::numeric, 2)
                         )
-                    ) ORDER BY t.dist_m
+                    ) ORDER BY t.key, t.dist_m
                 ), '[]'::json)
             )
             FROM (
@@ -164,13 +167,13 @@ def get_k_nearest_buildings(engine, lat: float, lng: float, building_key: str, k
                     fid,
                     key,
                     wkt_geom,
-                    ST_Distance(ST_SetSRID(wkt_geom::geometry, 4326), ST_SetSRID(ST_Point(:lng, :lat), 4326)) as dist_m
+                    ST_Distance(ST_SetSRID(wkt_geom::geometry, 4326), ST_SetSRID(ST_Point(:lng, :lat), 4326)) as dist_m,
+                    ROW_NUMBER() OVER (PARTITION BY key ORDER BY ST_SetSRID(wkt_geom::geometry, 4326) <-> ST_SetSRID(ST_Point(:lng, :lat), 4326)) as rn
                 FROM public.buildings
-                WHERE key = :building_key
-                ORDER BY ST_SetSRID(wkt_geom::geometry, 4326) <-> ST_SetSRID(ST_Point(:lng, :lat), 4326)
-                LIMIT LEAST(GREATEST(:k, 1), 50)
-            ) t;
-        """), {"lat": lat, "lng": lng, "building_key": building_key, "k": k})
+                WHERE key = ANY(:building_keys)
+            ) t
+            WHERE t.rn <= LEAST(GREATEST(:k, 1), 50);
+        """), {"lat": lat, "lng": lng, "building_keys": keys, "k": k})
 
         row = result.fetchone()
         return row[0] if row else {"type": "FeatureCollection", "features": []}
