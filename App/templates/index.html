@@ -97,6 +97,7 @@
 
   function backToMenu() {
     window.zoomToGlobe()
+    if (window.stopGeolocate) window.stopGeolocate();
     document.getElementById('main-menu').classList.remove('active');
     document.getElementById('map-overlay').style.visibility = 'hidden';
 

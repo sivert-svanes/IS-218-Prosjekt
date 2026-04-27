@@ -35,24 +35,40 @@ if (!maplibregl) {
   initializeDropdownMenus();
   initializeCoverageAnalysis(map);
 
-   const geolocate = new maplibregl.GeolocateControl({
+    const geolocate = new maplibregl.GeolocateControl({
         positionOptions: { enableHighAccuracy: true },
         trackUserLocation: true,
         showAccuracyCircle: true,
     });
     map.addControl(geolocate, 'top-right');
 
-
+    let isTracking = false;
+    geolocate.on('trackuserlocationstart', () => { isTracking = true; });
+    geolocate.on('trackuserlocationend', () => { isTracking = false; });
+    geolocate.on('error', () => { isTracking = false; });
 
     //last minute shit dont care
    // @ts-ignore
    window.geolocate = geolocate;
    // @ts-ignore
    window.triggerGeolocate = function() {
-        try {
-            geolocate.trigger();
-        } catch (err) {
-            console.warn('Geolocate trigger failed:', err);
+        if (!isTracking) {
+            try {
+                geolocate.trigger();
+            } catch (err) {
+                console.warn('Geolocate trigger failed:', err);
+            }
+        }
+    };
+
+    // @ts-ignore
+    window.stopGeolocate = function() {
+        if (isTracking) {
+            try {
+                geolocate.trigger();
+            } catch (err) {
+                console.warn('Geolocate stop failed:', err);
+            }
         }
     };
 
