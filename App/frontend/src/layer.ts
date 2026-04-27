@@ -27,7 +27,7 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
       ${props.adresse ? `<p style="margin: 2px 0;"><strong>Adresse:</strong> ${props.adresse}</p>` : ''}
       ${props.antall_plasser_igjen ? `<p style="margin: 2px 0;"><strong>Antall Plasser Igjen:</strong> ${props.antall_plasser_igjen}</p>` : ''}
       <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
-      <p style="margin: 2px 0;"><a href="#" onclick="openShelterDetailsModal(${fid}); return false;" style="color: #3498db; cursor: pointer; text-decoration: underline;"><strong>Detaljer</strong></a></p>
+      <p style="margin: 2px 0;"><a href="#" class="shelter-details-link" data-fid="${fid}" style="color: #3498db; cursor: pointer; text-decoration: underline;"><strong>Detaljer</strong></a></p>
     </div>`;
 
   // Handle date line wrapping if needed
@@ -38,7 +38,18 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
   }
 
   if (maplibregl) {
-    new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
+    const popup = new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
+
+    // Add event listener to the details link after popup is created
+    setTimeout(() => {
+      const link = document.querySelector(`#s_${fid} .shelter-details-link`) as HTMLElement;
+      if (link) {
+        link.addEventListener('click', (e: Event) => {
+          e.preventDefault();
+          window.openShelterDetailsModal(parseInt(fid), feature as GeoJSON.Feature<GeoJSON.Point>);
+        });
+      }
+    }, 0);
   }
 
   fetch(`/api/shelter-status/${fid}`)
@@ -56,6 +67,24 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
       }
     });
 }
+
+function createBuildingPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature<GeoJSON.Point>): void {
+  const coords = feature.geometry.coordinates.slice() as [number, number];
+  const props = feature.properties || {} as Record<string, any>;
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 260px;">
+      <h3 style="margin: 0 0 6px 0; font-size: 14px;">Destinasjon</h3>
+      ${props.key ? `<p style="margin: 2px 0;"><strong>Type:</strong> ${props.key}</p>` : ''}
+      ${props.distance_km ? `<p style="margin: 2px 0;"><strong>Avstand:</strong> ${props.distance_km} km</p>` : ''}
+      <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
+    </div>`;
+
+  if (maplibregl) {
+    new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
+  }
+}
+
 // Layer configuration constants
 // Geonorge Vann og vassdrag layers
 // Layer names sourced from GetCapabilities: wms.norges_grunnkart
@@ -287,19 +316,29 @@ export function AddShortestPathLayer(
       essential: true
     });
 
-    if (destinationShelterFylkeId && shelterFeature?.geometry.type === 'Point') {
-      const shelterLayerId = `shelters-circle-${destinationShelterFylkeId}`;
+    if (shelterFeature?.geometry.type === 'Point') {
+      // For shelter destinations with fylkeId, show the shelter layer
+      if (destinationShelterFylkeId) {
+        const shelterLayerId = `shelters-circle-${destinationShelterFylkeId}`;
 
-      if (map.getLayer(shelterLayerId)) {
-        map.setLayoutProperty(shelterLayerId, 'visibility', 'visible');
+        if (map.getLayer(shelterLayerId)) {
+          map.setLayoutProperty(shelterLayerId, 'visibility', 'visible');
 
-        const cb = layerCheckboxes.get(shelterLayerId);
-        if (cb) cb.checked = true;
+          const cb = layerCheckboxes.get(shelterLayerId);
+          if (cb) cb.checked = true;
 
+          try {
+            createShelterPopup(map, shelterFeature);
+          } catch (err) {
+            console.error('Error triggering popup:', err);
+          }
+        }
+      } else {
+        // For building destinations (no fylkeId), create a simple popup
         try {
-          createShelterPopup(map, shelterFeature);
+          createBuildingPopup(map, shelterFeature);
         } catch (err) {
-          console.error('Error triggering popup:', err);
+          console.error('Error creating building popup:', err);
         }
       }
     }

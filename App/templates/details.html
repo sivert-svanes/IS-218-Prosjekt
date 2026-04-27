@@ -94,6 +94,27 @@
             color: #999;
             font-style: italic;
         }
+
+        .route-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            white-space: nowrap;
+            margin-left: 10px;
+        }
+
+        .route-button:hover {
+            background: #764ba2;
+        }
+
+        .route-button:active {
+            background: #5a3d8a;
+        }
     </style>
 </head>
 <body>
@@ -114,7 +135,16 @@
                             {% if value is none or value == '' %}
                                 <span class="no-data">Ikke oppgitt</span>
                             {% else %}
-                                {{ value }}
+                                {% if key == 'vann' or key == 'water' %}
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span>{{ value }}</span>
+                                        <button class="route-button" data-building-key="water" data-shelter-lat="{{ shelter.get('latitude', shelter.get('lat', shelter.get('wgs84_north'))) }}" data-shelter-lng="{{ shelter.get('longitude', shelter.get('lng', shelter.get('wgs84_east'))) }}">
+                                            Rute til vann
+                                        </button>
+                                    </div>
+                                {% else %}
+                                    {{ value }}
+                                {% endif %}
                             {% endif %}
                         </div>
                     </div>
@@ -126,6 +156,29 @@
             </div>
         {% endif %}
     </div>
+
+    <script type="module">
+        import { calculateAndDisplayPathToBuilding, clearPath } from '../js/shortestPath.js';
+
+        // Get map reference from parent window if available
+        const mapContainer = window.opener || window.parent;
+
+        document.querySelectorAll('.route-button').forEach(button => {
+            button.addEventListener('click', async function() {
+                const buildingKey = this.getAttribute('data-building-key');
+                const shelterLat = parseFloat(this.getAttribute('data-shelter-lat'));
+                const shelterLng = parseFloat(this.getAttribute('data-shelter-lng'));
+
+                if (!isNaN(shelterLat) && !isNaN(shelterLng) && window.map) {
+                    clearPath(window.map);
+                    await calculateAndDisplayPathToBuilding(window.map, shelterLat, shelterLng, buildingKey);
+                    window.close();
+                } else {
+                    alert('Kunne ikke hente koordinater eller kartinstans');
+                }
+            });
+        });
+    </script>
 </body>
 </html>
 

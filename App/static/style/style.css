@@ -520,6 +520,15 @@ html, body {
   padding-bottom: 0;
 }
 
+.detail-row-action {
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  border-bottom: none;
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+}
+
 .detail-key {
   font-size: 11px;
   text-transform: uppercase;
@@ -532,4 +541,34 @@ html, body {
   font-size: 14px;
   color: #c2c8ca;
   word-break: break-word;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
+
+.route-button {
+  background: #667eea;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  margin-left: 12px;
+}
+
+.route-button:hover {
+  background: #764ba2;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.route-button:active {
+  background: #5a3d8a;
+  transform: translateY(0);
+}
+
+

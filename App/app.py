@@ -303,6 +303,39 @@ def api_nearest_shelters():
         traceback.print_exc()
         return flask.jsonify({"type": "FeatureCollection", "features": []})
 
+
+@app.route('/api/nearest-buildings')
+def api_nearest_buildings():
+    """Get k nearest buildings of a specific type to given coordinates.
+
+    Query parameters:
+        lat: Latitude in WGS84 (EPSG:4326)
+        lng: Longitude in WGS84 (EPSG:4326)
+        building_key: Building type key (e.g., 'water', 'hospital', 'convenience')
+        k: Number of nearest buildings to return (default 10, max 50)
+
+    Returns: GeoJSON FeatureCollection with k nearest buildings
+    """
+    lat = flask.request.args.get('lat', type=float)
+    lng = flask.request.args.get('lng', type=float)
+    building_key = flask.request.args.get('building_key', type=str)
+    k = flask.request.args.get('k', default=10, type=int)
+
+    if lat is None or lng is None or building_key is None:
+        return flask.jsonify({"type": "FeatureCollection", "features": [], "error": "Missing lat/lng/building_key"})
+
+    # Limit k to prevent abuse
+    k = min(max(1, k), 50)
+
+    try:
+        engine = database.create_engine()
+        geojson = database.get_k_nearest_buildings(engine, lat, lng, building_key, k)
+        return flask.jsonify(geojson)
+    except Exception as e:
+        print(f"Error fetching nearest buildings: {e}")
+        traceback.print_exc()
+        return flask.jsonify({"type": "FeatureCollection", "features": []})
+
 @app.route('/api/exclusion-zones')
 def api_exclusion_zones():
     """Get all exclusion zones as a GeoJSON FeatureCollection."""
