@@ -391,3 +391,34 @@ html, body {
     color: #fff;
     font-weight: 700;
 }
+
+.coverage-result-region {
+    font-size: 0.72rem;
+    font-weight: 400;
+    color: rgba(194,200,202,0.6);
+    margin-left: 6px;
+}
+
+.coverage-pct-bar-wrap {
+    height: 4px;
+    background: rgba(194,200,202,0.12);
+    border-radius: 2px;
+    margin: 8px 0 4px;
+    overflow: hidden;
+}
+
+.coverage-pct-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.5s ease;
+}
+
+.coverage-pct-label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-align: right;
+    margin-bottom: 10px;
+}
+
+.cv-ok-text { color: #7dd3a8; }
+.cv-no-text { color: #f08080; }
