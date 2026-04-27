@@ -6,6 +6,7 @@ from sqlalchemy import text
 from sqlalchemy.pool import QueuePool
 from dotenv import load_dotenv
 from enum import Enum
+import numpy as np
 
 load_dotenv()
 CONN_STR = os.getenv("DATABASE_URL")
@@ -242,40 +243,63 @@ def calculate_coverage_analysis(shelters, population_cells):
     total_population = 0
     total_capacity = sum(s["plasser"] for s in normalized_shelters)
     covered_population = 0
-    cell_coverages = []
 
-    for cell in population_cells:
-        people_left = max(0, int(cell.get("poptot") or 0))
-        cell_total = people_left
+    N = len(population_cells)
+    cell_coverages = [0.0] * N
 
-        if people_left <= 0:
-            cell_coverages.append(0.0)
-            continue
+    if normalized_shelters and N > 0:
 
-        total_population += people_left
-        cx = float(cell.get("x"))
-        cy = float(cell.get("y"))
+        cell_xy = np.array([[float(c["x"]), float(c["y"])] for c in population_cells], dtype=np.float64)
+        shelter_xy = np.array([[s["x"], s["y"]] for s in normalized_shelters], dtype=np.float64)
 
-        ordered = sorted(
-            normalized_shelters,
-            key=lambda s: ((s["x"] - cx) ** 2 + (s["y"] - cy) ** 2, s["fid"])
-        )
+        # Finn nærmeste shelter per celle
+        CHUNK = 2000
+        min_dist_sq = np.empty(N, dtype=np.float64)
 
-        cell_covered = 0
-        for shelter in ordered:
+        for i in range(0, N, CHUNK):
+            chunk = cell_xy[i:i + CHUNK]
+            dq = ((chunk[:, None, :] - shelter_xy[None, :, :]) ** 2).sum(2)
+            min_dist_sq[i:i + CHUNK] = dq.min(1)
+
+        # GLOBAL SORT (DETTE ER HELE FIXEN)
+        sorted_indices = np.argsort(min_dist_sq)
+
+        for cell_idx in sorted_indices:
+            cell = population_cells[cell_idx]
+
+            people_left = max(0, int(cell.get("poptot") or 0))
+            cell_total = people_left
+
             if people_left <= 0:
-                break
-            available = remaining_capacity.get(shelter["fid"], 0)
-            if available <= 0:
                 continue
-            assigned = min(people_left, available)
-            remaining_capacity[shelter["fid"]] -= assigned
-            shelter_allocated[shelter["fid"]] += assigned
-            people_left -= assigned
-            covered_population += assigned
-            cell_covered += assigned
 
-        cell_coverages.append(cell_covered / cell_total if cell_total > 0 else 0.0)
+            total_population += people_left
+
+            # sorter shelters for denne cellen (nærmest først)
+            dists = ((shelter_xy - cell_xy[cell_idx]) ** 2).sum(1)
+            shelter_order = np.argsort(dists)
+
+            cell_covered = 0
+
+            for si in shelter_order:
+                if people_left <= 0:
+                    break
+
+                s = normalized_shelters[si]
+                available = remaining_capacity.get(s["fid"], 0)
+
+                if available <= 0:
+                    continue
+
+                assigned = min(people_left, available)
+
+                remaining_capacity[s["fid"]] -= assigned
+                shelter_allocated[s["fid"]] += assigned
+                people_left -= assigned
+                covered_population += assigned
+                cell_covered += assigned
+
+            cell_coverages[cell_idx] = cell_covered / cell_total if cell_total > 0 else 0.0
 
     uncovered_population = total_population - covered_population
     coverage_ratio = (covered_population / total_population) if total_population else 0.0
@@ -333,25 +357,40 @@ def calculate_coverage_analysis(shelters, population_cells):
 
     return result
 
+def get_cache_key(scope: str, fylke_id: int | None = None):
+    return f"{scope}_{fylke_id}_v3"
+
+
+def save_coverage_cache():
+    try:
+        with open(CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(_coverage_analysis_cache, f)
+    except Exception as e:
+        print(f"Could not save coverage cache: {e}")
+
+
 def get_coverage_analysis(engine, scope: str, fylke_id: int | None = None):
     include_geometry = (scope != 'norway')
-    cache_key = f"{scope}_{fylke_id}_v2"
+    cache_key = get_cache_key(scope, fylke_id)
 
-    if not include_geometry and cache_key in _coverage_analysis_cache:
+    if cache_key in _coverage_analysis_cache:
         print(f"Using cached coverage analysis for {cache_key}")
         return _coverage_analysis_cache[cache_key]
 
     print(f"Calculating coverage analysis for {cache_key}")
 
     shelters = get_coverage_shelters(engine, scope, fylke_id)
-    population_cells = get_coverage_population_cells(engine, scope, fylke_id, include_geometry=include_geometry)
+    population_cells = get_coverage_population_cells(
+        engine,
+        scope,
+        fylke_id,
+        include_geometry=include_geometry
+    )
 
     result = calculate_coverage_analysis(shelters, population_cells)
 
-    if not include_geometry:
-        _coverage_analysis_cache[cache_key] = result
-        with open(CACHE_FILE, "w") as f:
-            json.dump(_coverage_analysis_cache, f)
+    _coverage_analysis_cache[cache_key] = result
+    save_coverage_cache()
 
     return result
 
@@ -394,6 +433,16 @@ def _parse_wkt_polygon(wkt: str) -> list:
                 current_ring += char
 
     return rings if rings else []
+
+def get_fylke_outline(engine, fylke_id: int):
+    with engine.connect() as conn:
+        row = conn.execute(text("""
+            SELECT ST_AsGeoJSON(ST_Transform(geomfylke, 4326)) AS geojson, navn
+            FROM public.fylker WHERE id = :fylke_id
+        """), {"fylke_id": fylke_id}).fetchone()
+        if not row or not row[0]:
+            return None
+        return {"geojson": json.loads(row[0]), "navn": row[1]}
 
 
 def get_exclusion_zones(engine):
