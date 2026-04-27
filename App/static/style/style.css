@@ -598,11 +598,15 @@ html, body {
 }
 
 #main-menu {
-  transition: transform 0.3s ease, background 0.05s ease;
+  transition: transform 0.3s ease, background 0.3s ease;
+    -webkit-animation: fadeInFromNone 0.5s ease-out;
+    -moz-animation: fadeInFromNone 0.5s ease-out;
+    -o-animation: fadeInFromNone 0.5s ease-out;
+    animation: fadeInFromNone 0.5s ease-out;
 }
 
 #main-menu.active {
-  transform: translateX(-30%);
+  transform: translateX(-100%);
     background: rgba(0, 0, 0, 0) !important;
 }
 

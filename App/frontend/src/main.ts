@@ -34,12 +34,55 @@ if (!maplibregl) {
   initializeDropdownMenus();
   initializeCoverageAnalysis(map);
 
-  const geolocate = new maplibregl.GeolocateControl({
-    positionOptions: { enableHighAccuracy: true as boolean },
-    trackUserLocation: true as boolean,
-    showAccuracyCircle: true as boolean,
-  });
-  map.addControl(geolocate, 'top-right');
+   const geolocate = new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+        showAccuracyCircle: true,
+    });
+    map.addControl(geolocate, 'top-right');
+
+
+
+    //last minute shit dont care
+   // @ts-ignore
+   window.geolocate = geolocate;
+   // @ts-ignore
+   window.triggerGeolocate = function() {
+        try {
+            geolocate.trigger();
+        } catch (err) {
+            console.warn('Geolocate trigger failed:', err);
+        }
+    };
+
+   // @ts-ignore
+    window.zoomToNorway = function() {
+        try {
+            map.flyTo({
+                center: [8.4689, 60.4720] as LngLatLike, // Center of Norway
+                zoom: 5.5,
+                duration: 1500, // Smooth animation duration in ms
+                essential: true
+            });
+        } catch (err) {
+            console.warn('Zoom to Norway failed:', err);
+        }
+    };
+
+    // @ts-ignore
+    window.zoomToGlobe = function() {
+        try {
+            map.flyTo({
+                center: [8.0, 59.0] as LngLatLike, // Original globe view
+                zoom: 2,
+                duration: 1500,
+                essential: true
+            });
+        } catch (err) {
+            console.warn('Zoom to globe failed:', err);
+        }
+    };
+
 
 /*  map.on('load', () => {
     try {
@@ -193,6 +236,8 @@ if (!maplibregl) {
       }
     });
 
+    // @ts-ignore
+    document.querySelectorAll('.maplibregl-ctrl').forEach(el => el.style.display = 'none')
     // Load all layers
     const fylkeIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
     (async () => {
@@ -205,6 +250,7 @@ if (!maplibregl) {
 
       // Initialize shelter details modal functionality
       initShelterDetailsModal(map);
+
     })().catch(err => console.error('Error loading layers:', err));
   });
 }
