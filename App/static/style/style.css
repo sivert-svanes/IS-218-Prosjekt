@@ -597,5 +597,14 @@ html, body {
   transform: translateY(0);
 }
 
+#main-menu {
+  transition: transform 0.3s ease, background 0.05s ease;
+}
+
+#main-menu.active {
+  transform: translateX(-30%);
+    background: rgba(0, 0, 0, 0) !important;
+}
+
 
 

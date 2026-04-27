@@ -41,13 +41,13 @@ if (!maplibregl) {
   });
   map.addControl(geolocate, 'top-right');
 
-  map.on('load', () => {
+/*  map.on('load', () => {
     try {
       geolocate?.trigger();
     } catch (err) {
       console.warn('Geolocate trigger failed:', err);
     }
-  });
+  });*/
 
   const scale = new maplibregl.ScaleControl({ maxWidth: 320, unit: 'metric' });
   map.addControl(scale, 'bottom-left');
