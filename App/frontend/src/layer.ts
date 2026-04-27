@@ -27,6 +27,7 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
       ${props.adresse ? `<p style="margin: 2px 0;"><strong>Adresse:</strong> ${props.adresse}</p>` : ''}
       ${props.antall_plasser_igjen ? `<p style="margin: 2px 0;"><strong>Antall Plasser Igjen:</strong> ${props.antall_plasser_igjen}</p>` : ''}
       <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
+      <p style="margin: 2px 0;"><a href="#" onclick="openShelterDetailsModal(${fid}); return false;" style="color: #3498db; cursor: pointer; text-decoration: underline;"><strong>Detaljer</strong></a></p>
     </div>`;
 
   // Handle date line wrapping if needed

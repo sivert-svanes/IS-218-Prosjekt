@@ -192,3 +192,26 @@ def get_exclusion_zones(engine):
             "type": "FeatureCollection",
             "features": features
         }
+
+
+def get_shelter_details(engine, fid: int):
+    """Fetch detailed information for a specific shelter by fid.
+
+    Args:
+        engine: Database engine
+        fid: Shelter ID (fid) to fetch details for
+
+    Returns:
+        Dictionary with shelter details from database, or None if not found
+    """
+    with engine.connect() as conn:
+        # Call the database procedure to get shelter details
+        result = conn.execute(text("""
+            SELECT get_shelter_details(:fid);
+        """), {"fid": fid})
+        row = result.fetchone()
+
+        if row and row[0]:
+            return row[0]
+        return None
+

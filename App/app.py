@@ -128,7 +128,39 @@ def valhalla_route():
     except Exception as e:
         print(f'Valhalla matrix proxy error: {e}')
         traceback.print_exc()
-        return flask.Response(f'Valhalla matrix error: {str(e)}', status=502)
+        return flask.Response(f'Valhalla route error: {str(e)}', status=502)
+
+@app.route('/shelter-details/<int:fid>')
+def shelter_details(fid):
+    """Fetch detailed information for a specific shelter and render details page."""
+    try:
+        engine = database.create_engine()
+        shelter_data = database.get_shelter_details(engine, fid)
+
+        if not shelter_data:
+            return flask.render_template('details.html', shelter=None, error="Tilfluktsrom ikke funnet")
+
+        return flask.render_template('details.html', shelter=shelter_data)
+    except Exception as e:
+        print(f"Error fetching shelter details: {e}")
+        traceback.print_exc()
+        return flask.render_template('details.html', shelter=None, error=str(e))
+
+@app.route('/api/shelter-details/<int:fid>')
+def api_shelter_details(fid):
+    """API endpoint to fetch shelter details as JSON."""
+    try:
+        engine = database.create_engine()
+        shelter_data = database.get_shelter_details(engine, fid)
+
+        if not shelter_data:
+            return flask.jsonify({"error": "Shelter not found"}), 404
+
+        return flask.jsonify(shelter_data)
+    except Exception as e:
+        print(f"Error fetching shelter details: {e}")
+        traceback.print_exc()
+        return flask.jsonify({"error": str(e)}), 500
 
 @app.route('/api/valhalla-route-polyline', methods=['POST'])
 def valhalla_route_polyline():
