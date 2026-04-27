@@ -1,12 +1,13 @@
 ﻿import os
-import json
 import math
+import json
+
+import numpy as np
 import sqlalchemy
 from sqlalchemy import text
 from sqlalchemy.pool import QueuePool
 from dotenv import load_dotenv
 from enum import Enum
-import numpy as np
 
 load_dotenv()
 CONN_STR = os.getenv("DATABASE_URL")
@@ -478,7 +479,6 @@ def get_exclusion_zones(engine):
         }
 
 
-
 def get_shelter_details(engine, fid: int):
     """Fetch detailed information for a specific shelter by fid.
 
@@ -499,6 +499,7 @@ def get_shelter_details(engine, fid: int):
         if row and row[0]:
             return row[0]
         return None
+
 
 
 # Amenity types as defined in the request
