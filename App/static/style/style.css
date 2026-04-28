@@ -660,6 +660,32 @@ html, body {
   transform: translateY(0);
 }
 
+/* Button Loading State */
+@keyframes button-spinner {
+  from { transform: translate(-50%, -50%) rotate(0deg); }
+  to { transform: translate(-50%, -50%) rotate(360deg); }
+}
+
+.route-button.loading, .hospital-button.loading {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+
+.route-button.loading::after, .hospital-button.loading::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  border-top-color: #fff;
+  animation: button-spinner 0.6s linear infinite;
+}
+
 #main-menu {
   transition: transform 0.3s ease, background 0.3s ease;
     -webkit-animation: fadeInFromNone 0.5s ease-out;

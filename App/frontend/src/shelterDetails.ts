@@ -138,16 +138,26 @@ export function initShelterDetailsModal(map: MaplibreGL.Map): void {
       modalContent.querySelectorAll('.route-button, .hospital-button').forEach((button: Element) => {
         button.addEventListener('click', async (e: Event) => {
           e.preventDefault();
-          const buildingKeysStr = (button as HTMLElement).getAttribute('data-building-keys');
-          const lat = parseFloat((button as HTMLElement).getAttribute('data-shelter-lat') || '0');
-          const lng = parseFloat((button as HTMLElement).getAttribute('data-shelter-lng') || '0');
+          const btn = button as HTMLElement;
+          if (btn.classList.contains('loading')) return;
+
+          const buildingKeysStr = btn.getAttribute('data-building-keys');
+          const lat = parseFloat(btn.getAttribute('data-shelter-lat') || '0');
+          const lng = parseFloat(btn.getAttribute('data-shelter-lng') || '0');
 
           if (!isNaN(lat) && !isNaN(lng) && buildingKeysStr) {
-            const { calculateAndDisplayPathToBuilding, clearPath } = await import('./shortestPath.js');
-            clearPath(map);
+            btn.classList.add('loading');
+            try {
+              const { calculateAndDisplayPathToBuilding, clearPath } = await import('./shortestPath.js');
+              clearPath(map);
 
-            // Pass comma-separated keys directly - the backend will return k results for each key
-            await calculateAndDisplayPathToBuilding(map, lat, lng, buildingKeysStr);
+              // Pass comma-separated keys directly - the backend will return k results for each key
+              await calculateAndDisplayPathToBuilding(map, lat, lng, buildingKeysStr);
+            } catch (err) {
+              console.error('Routing error:', err);
+            } finally {
+              btn.classList.remove('loading');
+            }
           }
         });
       });
