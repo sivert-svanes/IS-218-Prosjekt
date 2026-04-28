@@ -14,6 +14,7 @@ import { initializeExclusionZones, refreshExclusionZones } from './exclusion.js'
 import { initializeExclusionDraw } from './exclusionDraw.js';
 import { initializeCoverageAnalysis } from './coverageAnalysis.js'
 import { initShelterDetailsModal } from './shelterDetails.js';
+import { initSearch } from './search.js';
 import { getMapStyle, GLOBE_FADE_CONFIG, DARK_PAINTS } from './mapStyles.js';
 import './interfaces.js';
 
@@ -380,6 +381,7 @@ if (!maplibregl) {
       // Initialize shelter details modal functionality
       updateLoadingProgress(100, 'Klargjør grensesnitt...');
       initShelterDetailsModal(map);
+      initSearch(map);
       
       setTimeout(hideLoadingScreen, 500); // Give user a moment to see 100%
 

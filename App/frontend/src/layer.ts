@@ -7,6 +7,7 @@ import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId } from './interfac
 import { calculateBounds, buildEnumMapping, buildColorMapping, buildPatternConfig } from './utils.js';
 import { ExclusionZoneType, exclusionZoneColor, exclusionZonePattern } from './enum.js';
 import { buildPatternMapping } from './patterns.js';
+import { registerShelters } from './search.js';
 import { amenityLabels} from "./shelterDetails.js";
 
 const maplibregl = window.maplibregl;
@@ -228,6 +229,9 @@ export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: n
     try {
       const res = await fetch(`/api/fylke/${fylkeId}`);
       const geojson = await res.json();
+
+      // Register shelters for search functionality
+      registerShelters(fylkeId, geojson);
 
       const sourceId = `shelters-fylke-${fylkeId}`;
       const layerId  = `shelters-circle-${fylkeId}`;

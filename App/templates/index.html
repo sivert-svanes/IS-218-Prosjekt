@@ -63,12 +63,35 @@
           <div class="box text prevent-select button" id="draw-cancel-btn">Avbryt</div>
       </div>
 
+      <div class="box text prevent-select button" id="search-toggle-btn" style="display: none;">
+        <span>Søk</span>
+      </div>
+
     </div>
 
     <div class="dropdown-menu" id="layers-menu"></div>
 
     <div class="dropdown-menu" id="styles-menu">
       <div class="dropdown-empty">No map styles available</div>
+    </div>
+
+    <!-- Search Side Panel -->
+    <div id="search-panel" class="side-panel">
+      <div class="side-panel-header">
+        <h2 style="color: #f2f3f0; margin: 0; font-size: 1.2rem;">Søk tilfluktsrom</h2>
+        <button id="close-search-panel" class="close-btn">&times;</button>
+      </div>
+      <div class="side-panel-content">
+        <div class="search-controls">
+          <input type="text" id="shelter-search-input" placeholder="Søk adresse, ID, romnr..." class="box text search-input">
+          <select id="fylke-filter" class="box text fylke-select" style="background: rgba(15,25,30,0.5); color: #c2c8ca; border: none; border-radius: 0.25rem; margin-top: 10px; padding: 0.5rem;">
+            <option value="all">Alle fylker</option>
+          </select>
+        </div>
+        <div id="search-results" class="search-results">
+          <!-- Results will be injected here -->
+        </div>
+      </div>
     </div>
 
     <script type="module" src="{{ url_for('static', filename='js/main.js') }}?v={{ ts }}"
@@ -91,6 +114,8 @@
     const coverageBtn = document.getElementById('coverage-analysis-btn');
     if (coverageBtn) coverageBtn.style.display = 'none';
     document.getElementById('exclusion-draw-controls').style.display = 'none';
+    document.getElementById('search-toggle-btn').style.display = 'none';
+    document.getElementById('search-panel').classList.remove('open');
 
     // Show buttons based on mode
     if (mode === 'find-shelter') {
@@ -98,6 +123,7 @@
       document.getElementById('shortest-path-btn').style.display = 'flex';
     } else if (mode === 'logistics') {
       window.triggerGeolocate();
+      document.getElementById('search-toggle-btn').style.display = 'flex';
       // No buttons for logistics
     } else if (mode === 'landsoversikt') {
       window.zoomToNorway();
@@ -121,6 +147,8 @@
     const coverageBtn = document.getElementById('coverage-analysis-btn');
     if (coverageBtn) coverageBtn.style.display = 'none';
     document.getElementById('exclusion-draw-controls').style.display = 'none';
+    document.getElementById('search-toggle-btn').style.display = 'none';
+    document.getElementById('search-panel').classList.remove('open');
     if (window.cancelDrawing) window.cancelDrawing();
   }
 
