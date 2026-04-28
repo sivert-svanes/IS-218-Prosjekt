@@ -134,6 +134,7 @@
 
   async function backToMenu() {
     window.currentMode = null;
+    if (window.closeShelterDetailsModal) window.closeShelterDetailsModal();
     if (window.zoomToGlobe) await window.zoomToGlobe();
     if (window.startRotation) window.startRotation();
     if (window.stopGeolocate) window.stopGeolocate();
@@ -150,6 +151,10 @@
     document.getElementById('search-toggle-btn').style.display = 'none';
     document.getElementById('search-panel').classList.remove('open');
     if (window.cancelDrawing) window.cancelDrawing();
+    if (window.clearPath) window.clearPath();
+    
+    // Close any open MapLibre popups
+    document.querySelectorAll('.maplibregl-popup').forEach(el => el.remove());
   }
 
 

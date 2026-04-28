@@ -224,6 +224,9 @@ if (!maplibregl) {
     });
   }
 
+  // @ts-ignore
+  window.clearPath = () => clearPath(map);
+
   // Clear path button handler
   const clearPathBtn = document.getElementById('clear-path-btn');
   if (clearPathBtn) {
