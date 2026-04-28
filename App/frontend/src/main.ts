@@ -7,7 +7,7 @@ import {
   AddFKBVeiLayer,
   AddAmenityLayers,
 } from './layer.js'
-import {registerStyleInMenu, initializeDropdownMenus} from './layerControl.js'
+import {registerStyleInMenu, initializeDropdownMenus, layerCheckboxes} from './layerControl.js'
 import {registerStyle} from "./mapStyles.js";
 import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
 import { initializeExclusionZones, refreshExclusionZones } from './exclusion.js'
@@ -89,6 +89,37 @@ if (!maplibregl) {
             } catch (err) {
                 console.warn('Geolocate stop failed:', err);
             }
+        }
+    };
+
+    // @ts-ignore
+    window.togglePresetLayers = function(mode: string | null) {
+        const amenityTypes = ['chemist', 'trade', 'doctors', 'hospital', 'drinking_water', 'supermarket', 'convenience', 'hardware'];
+        const exclusionLayer = 'exclusion-zones-layer';
+
+        const setVisibility = (layerId: string, visible: boolean) => {
+            if (map.getLayer(layerId)) {
+                const visibility = visible ? 'visible' : 'none';
+                map.setLayoutProperty(layerId, 'visibility', visibility);
+                
+                // Sync UI checkbox if it exists
+                const cb = layerCheckboxes.get(layerId);
+                if (cb) {
+                    cb.checked = visible;
+                }
+            }
+        };
+
+        if (mode === 'logistics') {
+            amenityTypes.forEach(type => setVisibility(`amenity-layer-${type}`, true));
+            setVisibility(exclusionLayer, true);
+        } else if (mode === 'find-shelter') {
+            amenityTypes.forEach(type => setVisibility(`amenity-layer-${type}`, false));
+            setVisibility(exclusionLayer, true);
+        } else {
+            // Disable all when going back to menu or other modes
+            amenityTypes.forEach(type => setVisibility(`amenity-layer-${type}`, false));
+            setVisibility(exclusionLayer, false);
         }
     };
 

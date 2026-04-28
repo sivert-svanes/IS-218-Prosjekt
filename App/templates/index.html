@@ -130,10 +130,16 @@
       document.getElementById('coverage-analysis-btn').style.display = 'flex';
       document.getElementById('exclusion-draw-controls').style.display = 'contents';
     }
+
+    // Toggle preset layers based on mode
+    if (window.togglePresetLayers) {
+      window.togglePresetLayers(mode);
+    }
   }
 
   async function backToMenu() {
     window.currentMode = null;
+    if (window.togglePresetLayers) window.togglePresetLayers(null);
     if (window.closeShelterDetailsModal) window.closeShelterDetailsModal();
     if (window.zoomToGlobe) await window.zoomToGlobe();
     if (window.startRotation) window.startRotation();
