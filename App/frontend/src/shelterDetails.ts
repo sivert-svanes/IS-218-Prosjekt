@@ -17,7 +17,7 @@ export const amenityLabels: Record<string, string> = {
 export const amenityButtons: Record<string, { fields: string[], keys: string[], icon: string }> = {
   water: {
     fields: ['vann', 'water'],
-    keys: ['water'],
+    keys: ['drinking_water'],
     icon: 'Finn drikkevann'
   },
   food: {
@@ -44,6 +44,7 @@ export const amenityButtons: Record<string, { fields: string[], keys: string[], 
 export function initShelterDetailsModal(map: MaplibreGL.Map): void {
   // Global function to open shelter details modal
   window.openShelterDetailsModal = async (fid: number, feature?: GeoJSON.Feature<GeoJSON.Point>) => {
+    if ((window as any).currentMode !== 'logistics') return;
     try {
       const response = await fetch(`/api/shelter-details/${fid}`);
       if (!response.ok) throw new Error('Failed to fetch shelter details');

@@ -21,6 +21,8 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
   const props = feature.properties || {} as Record<string, string>;
   const fid = props.fid || '';
 
+  const showDetails = (window as any).currentMode === 'logistics';
+
   const html = `
     <div id="s_${fid}" style="font-family: sans-serif; max-width: 260px;">
       <h3 style="margin: 0 0 6px 0; font-size: 14px;">Tilfluktsrom - ${props.romnr || 'Ukjent adresse'}</h3>
@@ -28,7 +30,7 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
       ${props.adresse ? `<p style="margin: 2px 0;"><strong>Adresse:</strong> ${props.adresse}</p>` : ''}
       ${props.antall_plasser_igjen ? `<p style="margin: 2px 0;"><strong>Antall Plasser Igjen:</strong> ${props.antall_plasser_igjen}</p>` : ''}
       <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
-      <p style="margin: 2px 0;"><a href="#" class="shelter-details-link" data-fid="${fid}" style="color: #3498db; cursor: pointer; text-decoration: underline;"><strong>Detaljer</strong></a></p>
+      ${showDetails ? `<p style="margin: 2px 0;"><a href="#" class="shelter-details-link" data-fid="${fid}" style="color: #3498db; cursor: pointer; text-decoration: underline;"><strong>Detaljer</strong></a></p>` : ''}
     </div>`;
 
   // Handle date line wrapping if needed

@@ -78,6 +78,7 @@
 
     <script>
     function selectMode(mode) {
+    window.currentMode = mode;
     if (window.stopRotation) window.stopRotation();
     document.getElementById('main-menu').classList.add('active');
     document.getElementById('map-overlay').style.visibility = 'visible';
@@ -106,6 +107,7 @@
   }
 
   async function backToMenu() {
+    window.currentMode = null;
     if (window.zoomToGlobe) await window.zoomToGlobe();
     if (window.startRotation) window.startRotation();
     if (window.stopGeolocate) window.stopGeolocate();
