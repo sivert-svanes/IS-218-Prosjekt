@@ -55,6 +55,10 @@ export async function initializeExclusionZones(map: MaplibreGL.Map): Promise<voi
   }
 }
 
+export async function refreshExclusionZones(map: MaplibreGL.Map): Promise<void> {
+    await initializeExclusionZones(map);
+}
+
 export function getExclusionZones(): ExclusionZoneBounds[] {
   return exclusionZones;
 }

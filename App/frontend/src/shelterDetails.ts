@@ -17,7 +17,7 @@ export const amenityLabels: Record<string, string> = {
 export const amenityButtons: Record<string, { fields: string[], keys: string[], icon: string }> = {
   water: {
     fields: ['vann', 'water'],
-    keys: ['water'],
+    keys: ['drinking_water'],
     icon: 'Finn drikkevann'
   },
   food: {
@@ -44,6 +44,7 @@ export const amenityButtons: Record<string, { fields: string[], keys: string[], 
 export function initShelterDetailsModal(map: MaplibreGL.Map): void {
   // Global function to open shelter details modal
   window.openShelterDetailsModal = async (fid: number, feature?: GeoJSON.Feature<GeoJSON.Point>) => {
+    if ((window as any).currentMode !== 'logistics') return;
     try {
       const response = await fetch(`/api/shelter-details/${fid}`);
       if (!response.ok) throw new Error('Failed to fetch shelter details');
@@ -137,16 +138,26 @@ export function initShelterDetailsModal(map: MaplibreGL.Map): void {
       modalContent.querySelectorAll('.route-button, .hospital-button').forEach((button: Element) => {
         button.addEventListener('click', async (e: Event) => {
           e.preventDefault();
-          const buildingKeysStr = (button as HTMLElement).getAttribute('data-building-keys');
-          const lat = parseFloat((button as HTMLElement).getAttribute('data-shelter-lat') || '0');
-          const lng = parseFloat((button as HTMLElement).getAttribute('data-shelter-lng') || '0');
+          const btn = button as HTMLElement;
+          if (btn.classList.contains('loading')) return;
+
+          const buildingKeysStr = btn.getAttribute('data-building-keys');
+          const lat = parseFloat(btn.getAttribute('data-shelter-lat') || '0');
+          const lng = parseFloat(btn.getAttribute('data-shelter-lng') || '0');
 
           if (!isNaN(lat) && !isNaN(lng) && buildingKeysStr) {
-            const { calculateAndDisplayPathToBuilding, clearPath } = await import('./shortestPath.js');
-            clearPath(map);
+            btn.classList.add('loading');
+            try {
+              const { calculateAndDisplayPathToBuilding, clearPath } = await import('./shortestPath.js');
+              clearPath(map);
 
-            // Pass comma-separated keys directly - the backend will return k results for each key
-            await calculateAndDisplayPathToBuilding(map, lat, lng, buildingKeysStr);
+              // Pass comma-separated keys directly - the backend will return k results for each key
+              await calculateAndDisplayPathToBuilding(map, lat, lng, buildingKeysStr);
+            } catch (err) {
+              console.error('Routing error:', err);
+            } finally {
+              btn.classList.remove('loading');
+            }
           }
         });
       });

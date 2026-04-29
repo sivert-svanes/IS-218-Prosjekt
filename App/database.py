@@ -529,6 +529,14 @@ def get_exclusion_zones(engine):
         }
 
 
+def add_exclusion_zone(engine, wkt, zone_type):
+    """Add a new exclusion zone to the database."""
+    with engine.connect() as conn:
+        query = text("INSERT INTO exclusionzone (geom_wkt, type) VALUES (:wkt, :type)")
+        conn.execute(query, {"wkt": wkt, "type": zone_type})
+        conn.commit()
+
+
 def get_shelter_details(engine, fid: int):
     """Fetch detailed information for a specific shelter by fid.
 

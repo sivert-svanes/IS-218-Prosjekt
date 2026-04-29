@@ -7,6 +7,7 @@ import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId } from './interfac
 import { calculateBounds, buildEnumMapping, buildColorMapping, buildPatternConfig } from './utils.js';
 import { ExclusionZoneType, exclusionZoneColor, exclusionZonePattern } from './enum.js';
 import { buildPatternMapping } from './patterns.js';
+import { registerShelters } from './search.js';
 import { amenityLabels} from "./shelterDetails.js";
 
 const maplibregl = window.maplibregl;
@@ -21,6 +22,8 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
   const props = feature.properties || {} as Record<string, string>;
   const fid = props.fid || '';
 
+  const showDetails = (window as any).currentMode === 'logistics';
+
   const html = `
     <div id="s_${fid}" style="font-family: sans-serif; max-width: 260px;">
       <h3 style="margin: 0 0 6px 0; font-size: 14px;">Tilfluktsrom - ${props.romnr || 'Ukjent adresse'}</h3>
@@ -28,7 +31,7 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
       ${props.adresse ? `<p style="margin: 2px 0;"><strong>Adresse:</strong> ${props.adresse}</p>` : ''}
       ${props.antall_plasser_igjen ? `<p style="margin: 2px 0;"><strong>Antall Plasser Igjen:</strong> ${props.antall_plasser_igjen}</p>` : ''}
       <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
-      <p style="margin: 2px 0;"><a href="#" class="shelter-details-link" data-fid="${fid}" style="color: #3498db; cursor: pointer; text-decoration: underline;"><strong>Detaljer</strong></a></p>
+      ${showDetails ? `<p style="margin: 2px 0;"><a href="#" class="shelter-details-link" data-fid="${fid}" style="color: #3498db; cursor: pointer; text-decoration: underline;"><strong>Detaljer</strong></a></p>` : ''}
     </div>`;
 
   // Handle date line wrapping if needed
@@ -219,13 +222,16 @@ export function AddFKBVeiLayer(map: MaplibreGL.Map, visible: boolean = false): v
  * @param fylkeIds The ids of the counties to request
  * @param visible Controls if the layer is displayed once it's been loaded
  */
-export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: number[], visible: boolean = false): Promise<void> {
+export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: number[], visible: boolean = false, onProgress?: (fylkeId: number) => void): Promise<void> {
   const layerVisibility = visible ? 'visible' : 'none';
 
   for (const fylkeId of fylkeIds) {
     try {
       const res = await fetch(`/api/fylke/${fylkeId}`);
       const geojson = await res.json();
+
+      // Register shelters for search functionality
+      registerShelters(fylkeId, geojson);
 
       const sourceId = `shelters-fylke-${fylkeId}`;
       const layerId  = `shelters-circle-${fylkeId}`;
@@ -247,6 +253,8 @@ export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: n
       });
 
       registerLayer(layerId, `Tilfluktsrom - ${fylkeNavn}`, visible, map);
+
+      if (onProgress) onProgress(fylkeId);
 
       map.on('click', layerId, (e) => {
         if (!e.features || e.features.length === 0) return;
@@ -523,16 +531,14 @@ export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON
 export async function AddAmenityLayers(
   map: MaplibreGL.Map,
   amenityTypes?: string[],
-  visible: boolean = false
+  visible: boolean = false,
+  onProgress?: (amenityType: string) => void
 ): Promise<void> {
   const { AmenityType, amenityColor } = await import('./enum.js');
 
   // Use all types if not specified
   const typesToLoad = amenityTypes || Object.values(AmenityType);
   const layerVisibility = visible ? 'visible' : 'none';
-
-
-
 
   for (const amenityType of typesToLoad) {
     try {
@@ -541,6 +547,7 @@ export async function AddAmenityLayers(
 
       if (!geojson.features || geojson.features.length === 0) {
         console.warn(`No amenities found for type: ${amenityType}`);
+        if (onProgress) onProgress(amenityType);
         continue;
       }
 
@@ -602,10 +609,13 @@ export async function AddAmenityLayers(
       // Register the layer in the layer control
       registerLayer(layerId, label, visible, map);
 
+      if (onProgress) onProgress(amenityType);
+
       await new Promise(resolve => setTimeout(resolve, 50));
 
     } catch (err) {
       console.error(`Failed to load amenities for type ${amenityType}:`, err);
+      if (onProgress) onProgress(amenityType);
     }
   }
 }

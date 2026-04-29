@@ -336,8 +336,25 @@ def api_nearest_buildings():
         traceback.print_exc()
         return flask.jsonify({"type": "FeatureCollection", "features": []})
 
-@app.route('/api/exclusion-zones')
+@app.route('/api/exclusion-zones', methods=['GET', 'POST'])
 def api_exclusion_zones():
+    """Get all exclusion zones or add a new one."""
+    if flask.request.method == 'POST':
+        data = flask.request.get_json()
+        wkt = data.get('wkt')
+        zone_type = data.get('type')
+        if not wkt or not zone_type:
+            return flask.jsonify({"error": "Missing wkt or type"}), 400
+
+        try:
+            engine = database.create_engine()
+            database.add_exclusion_zone(engine, wkt, zone_type)
+            return flask.jsonify({"status": "success"})
+        except Exception as e:
+            print(f"Error adding exclusion zone: {e}")
+            traceback.print_exc()
+            return flask.jsonify({"error": str(e)}), 500
+
     """Get all exclusion zones as a GeoJSON FeatureCollection."""
     try:
         engine = database.create_engine()
