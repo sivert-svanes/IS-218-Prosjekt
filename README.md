@@ -196,6 +196,7 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - get_coverage_analysis: Coverage statistics         │  │
 │   │  - build_geojson_feature: Utility for GeoJSON format  │  │
 │   │  - build_geojson_collection: Aggregate GeoJSON data   │  │
+│   │  - get_k_nearest_features: from selected table        │  │
 │   └───────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -250,22 +251,6 @@ low supply and provide routes to get supplies, accounting for threats.
 │   └─────────────────────────────────────────────────────┘    │ 
 │                                                              │
 │   ┌─────────────────────────────────────────────────────┐    │
-│   │ Table: nvdb_roads                                   │    │
-│   ├─────────────────────────────────────────────────────┤    │
-│   │ Columns:                                            │    │
-│   │  - ogc_fid: INTEGER, PK                             │    │
-│   │  - net.typeveg: CHARACTER VARYING                   │    │
-│   │  - geom_4326: GEOMETRY(LineString, 4326)            │    │
-│   │                                                     │    │
-│   │ Indexes:                                            │    │
-│   │  - ogc_fid: UNIQUE                                  │    │
-│   │  - geom_4326: GIST                                  │    │
-│   │  - net.typeveg: B-tree                              │    │
-│   │                                                     │    │
-│   │ Storage:                                            │    │
-│   │  - geom_4326: TOAST Compressed                      │    │
-│   └─────────────────────────────────────────────────────┘    │
-│   ┌─────────────────────────────────────────────────────┐    │
 │   │ Table: befolkning_rutenett_250m_2025                │    │
 │   ├─────────────────────────────────────────────────────┤    │
 │   │ Columns:                                            │    │
@@ -286,26 +271,6 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - ..._pkey: UNIQUE                                 │    │
 │   │  - ..._geometry_geom_idx: GIST                      │    │
 │   │                                                     │    │
-│   └─────────────────────────────────────────────────────┘    │
-│                                                              │
-│   ┌─────────────────────────────────────────────────────┐    │
-│   │ Table: brannstasjoner                               │    │
-│   ├─────────────────────────────────────────────────────┤    │
-│   │ Columns:                                            │    │
-│   │  - id: INTEGER, PK                                  │    │
-│   │  - geom: GEOMETRY(Point, 4326)                      │    │
-│   │  - gml_id: VARCHAR                                  │    │
-│   │  - opphav: VARCHAR                                  │    │
-│   │  - brannstasjon: VARCHAR                            │    │
-│   │  - brannvesen: VARCHAR                              │    │
-│   │  - stasjonstype: VARCHAR                            │    │
-│   │  - kasernert: VARCHAR                               │    │
-│   │                                                     │    │
-│   │ Indexes:                                            │    │
-│   │  - id: UNIQUE                                       │    │
-│   │  - geom: GIST                                       │    │
-│   │                                                     │    │
-│   │ Note: Legacy table for fire stations (deprecated)   │    │
 │   └─────────────────────────────────────────────────────┘    │
 │                                                              │
 │   ┌─────────────────────────────────────────────────────┐    │
@@ -390,6 +355,20 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │                                                     │    │
 │   │ Based on:                                           │    │
 │   │  - View built from shelter_egenskaper table         │    │
+│   └─────────────────────────────────────────────────────┘    │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: Buildings                                    │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - fid: BIGINT, PK                                  │    │
+│   │  - key: Varchar(24), NOT NULL                       │    │
+│   │  - wkt_geom: Point                                  │    │
+│   │                                                     │    │
+│   │ Purpose:                                            │    │
+│   │ Stores building point data for routing              │    │
+│   │                                                     │    │
+│   │ Indexes:                                            │    │
+│   │  - buildings_key_index: UNIQUE                      |    |
 │   └─────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────┘
 ```
