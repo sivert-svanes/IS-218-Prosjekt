@@ -1,258 +1,249 @@
 ﻿import type * as MaplibreGL from "maplibre-gl";
 import { AddShortestPathLayer, ClearShortestPathLayer } from "./layer.js";
-import { GraphNode, RoadSegment, CacheBounds } from "./interfaces.js";
+import type { ShelterFeature } from "./interfaces.js";
+import { getExclusionZones } from "./exclusion.js";
+import { decodePolyline6 } from "./utils.js";
 
-let roadNetworkCache: any = null;
-let roadNetworkCacheBounds: CacheBounds | null = null;
-const WGS84_CONSTANT = 20037508.34;
-const ROAD_TYPES = 'Enkel%20bilveg,Bilferje,Rampe,Rundkj%C3%B8ring,Kanalisert%20veg';
+const API_TIMEOUT_MS = 20000;
+const ROUTE_CACHE = new Map<string, any>();
+const NUM_SHELTERS_TO_REQUEST = 15;
 
 
-const haversineDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-  const R = 6371, dLat = (lat2 - lat1) * Math.PI / 180, dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
-
-async function ensureRoadNetworkLoaded(map: MaplibreGL.Map, userLat: number, userLng: number, shelterLat: number, shelterLng: number): Promise<void> {
-  // Calculate haversine distance to shelter
-  const distToShelter = haversineDistance(userLat, userLng, shelterLat, shelterLng);
-
-  // Use distance + 20% buffer to get the radius for road loading
-  const radius = distToShelter * 1.2;
-
-  // Convert radius (km) to degrees (rough approximation: 1 degree ≈ 111 km)
-  const radiusDegrees = radius / 111;
-
-  // Create bounding box around the line between user and shelter
-  const minLat = Math.min(userLat, shelterLat) - radiusDegrees;
-  const maxLat = Math.max(userLat, shelterLat) + radiusDegrees;
-  const minLng = Math.min(userLng, shelterLng) - radiusDegrees;
-  const maxLng = Math.max(userLng, shelterLng) + radiusDegrees;
-
-  const toMercator = (deg: number, isSin: boolean) => {
-    const rad = (deg + 90) / 360 * Math.PI;
-    return (isSin ? Math.log(Math.tan(rad)) : deg / 180) * WGS84_CONSTANT;
-  };
-
-  const url = `/api/nvdb/roads?min_x=${toMercator(minLng, false)}&min_y=${toMercator(minLat, true)}&max_x=${toMercator(maxLng, false)}&max_y=${toMercator(maxLat, true)}&road_types=${ROAD_TYPES}`;
-  const response = await fetch(url);
-
-  if (response.ok) {
-    roadNetworkCache = await response.json();
-    roadNetworkCacheBounds = { minLat, maxLat, minLng, maxLng };
-  }
-}
-
-function isCacheValid(userLat: number, userLng: number, shelterLat: number, shelterLng: number): boolean {
-  if (!roadNetworkCache || !roadNetworkCacheBounds) {
-    return false;
-  }
-
-  const { minLat, maxLat, minLng, maxLng } = roadNetworkCacheBounds;
-  const userInBounds = userLat >= minLat && userLat <= maxLat && userLng >= minLng && userLng <= maxLng;
-  const shelterInBounds = shelterLat >= minLat && shelterLat <= maxLat && shelterLng >= minLng && shelterLng <= maxLng;
-
-  const valid = userInBounds && shelterInBounds;
-
-  if (!valid) {
-    roadNetworkCache = null;
-    roadNetworkCacheBounds = null;
-  }
-
-  return valid;
-}
-
-function buildRoadGraph(features: any[]): Map<string, GraphNode> {
-  const graph = new Map<string, GraphNode>();
-  const nodeMap = new Map<string, any>();
-  let nodeId = 0;
-
-  features.forEach((feature) => {
-    if (feature.geometry.type !== 'LineString') return;
-    const coords = feature.geometry.coordinates as [number, number][];
-    if (coords.length < 2) return;
-
-    const getNode = (coord: [number, number]) => {
-      const key = `${coord[0]},${coord[1]}`;
-      if (!nodeMap.has(key)) {
-        const id = `node-${nodeId++}`;
-        nodeMap.set(key, { id, lng: coord[0], lat: coord[1] });
-        graph.set(id, { id, neighbors: [], lng: coord[0], lat: coord[1] });
-      }
-      return nodeMap.get(key)!;
-    };
-
-    const start = getNode(coords[0]);
-    const end = getNode(coords[coords.length - 1]);
-    const dist = haversineDistance(start.lat, start.lng, end.lat, end.lng);
-    const segment: RoadSegment = { coordinates: coords, distance: dist, start, end };
-
-    graph.get(start.id)!.neighbors.push({ nodeId: end.id, segment });
-    graph.get(end.id)!.neighbors.push({ nodeId: start.id, segment: { ...segment, start: end, end: start } });
-  });
-
-  return graph;
-}
-
-function findNearestInGraph(lat: number, lng: number, graph: Map<string, GraphNode>): string | null {
-  let nearest: string | null = null;
-  let minDist = Infinity;
-
-  graph.forEach((node) => {
-    if (node.neighbors.length === 0) return;
-    const dist = haversineDistance(lat, lng, node.lat, node.lng);
-    if (dist < minDist) { minDist = dist; nearest = node.id; }
-  });
-
-  return nearest;
-}
-
-async function findNearestSheltersViaAPI(lat: number, lng: number, k: number = 10): Promise<any[]> {
+async function findNearestShelters(lat: number, lng: number, k: number = NUM_SHELTERS_TO_REQUEST): Promise<any[]> {
   try {
     const response = await fetch(`/api/nearest-shelters?lat=${lat}&lng=${lng}&k=${k}`);
-    if (response.ok) {
-      const geojson = await response.json();
-      return geojson.features || [];
-    }
+    return response.ok ? (await response.json()).features || [] : [];
   } catch (err) {
-    console.error('Failed to fetch nearest shelters from API:', err);
+    console.error('Failed to fetch nearest shelters:', err);
+    return [];
   }
-  return [];
 }
 
-function aStar(graph: Map<string, GraphNode>, startId: string, endId: string, endLat: number, endLng: number): string[] {
-  const openSet = new Set([startId]);
-  const cameFrom = new Map<string, string>();
-  const gScore = new Map<string, number>();
-  const fScore = new Map<string, number>();
-
-  graph.forEach((_, id) => {
-    gScore.set(id, Infinity);
-    fScore.set(id, Infinity);
-  });
-
-  gScore.set(startId, 0);
-  const startNode = graph.get(startId)!;
-  fScore.set(startId, haversineDistance(startNode.lat, startNode.lng, endLat, endLng));
-
-  while (openSet.size > 0) {
-    let current: string | null = null;
-    let lowestF = Infinity;
-
-    openSet.forEach(nodeId => {
-      const f = fScore.get(nodeId) ?? Infinity;
-      if (f < lowestF) { lowestF = f; current = nodeId; }
-    });
-
-    if (!current || current === endId) {
-      const path: string[] = [];
-      let curr: string | undefined = endId;
-      while (curr !== undefined) {
-        path.unshift(curr);
-        curr = cameFrom.get(curr);
-      }
-      return path;
-    }
-
-    openSet.delete(current);
-    const currentNode = graph.get(current)!;
-
-    currentNode.neighbors.forEach(({ nodeId: neighbor, segment }) => {
-      const tentativeGScore = (gScore.get(current!) ?? 0) + segment.distance;
-      if (tentativeGScore >= (gScore.get(neighbor) ?? Infinity)) return;
-
-      cameFrom.set(neighbor, current!);
-      gScore.set(neighbor, tentativeGScore);
-
-      const neighborNode = graph.get(neighbor)!;
-      fScore.set(neighbor, tentativeGScore + haversineDistance(neighborNode.lat, neighborNode.lng, endLat, endLng));
-      openSet.add(neighbor);
-    });
-  }
-
-  return [];
-}
-
-function buildPathCoordinates(path: string[], graph: Map<string, GraphNode>, endPoint: [number, number]): [number, number][] {
-  const coords: [number, number][] = [];
-
-  for (let i = 0; i < path.length - 1; i++) {
-    const neighbor = graph.get(path[i])!.neighbors.find(n => n.nodeId === path[i + 1]);
-    if (!neighbor) continue;
-
-    let segCoords = neighbor.segment.coordinates;
-    const currentPos: [number, number] = [graph.get(path[i])!.lng, graph.get(path[i])!.lat];
-    const start = segCoords[0], end = segCoords[segCoords.length - 1];
-
-    if (Math.hypot(end[0] - currentPos[0], end[1] - currentPos[1]) < Math.hypot(start[0] - currentPos[0], start[1] - currentPos[1])) {
-      segCoords = [...segCoords].reverse();
-    }
-
-    coords.push(...(i === 0 ? segCoords : segCoords.slice(1)));
-  }
-
-  coords.push(endPoint);
-  return coords;
-}
-
-export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, lng: number): Promise<void> {
+async function findNearestBuildings(lat: number, lng: number, buildingKey: string, k: number = 15): Promise<any[]> {
   try {
-    // Get k=10 nearest shelters from database
-    const shelterFeatures = await findNearestSheltersViaAPI(lat, lng, 10);
-    if (shelterFeatures.length === 0) return;
+    const params = new URLSearchParams({
+      lat: lat.toString(),
+      lng: lng.toString(),
+      building_key: buildingKey,
+      k: k.toString()
+    });
+    const response = await fetch(`/api/nearest-buildings?${params.toString()}`);
+    return response.ok ? (await response.json()).features || [] : [];
+  } catch (err) {
+    console.error('Failed to fetch nearest buildings:', err);
+    return [];
+  }
+}
 
-    // Try each shelter in order of distance until we find a valid path
-    for (const shelterFeature of shelterFeatures) {
-      if (shelterFeature.geometry.type !== 'Point') continue;
+async function getShortestShelterViaMatrix(userLng: number, userLat: number, shelters: any[]): Promise<{ shelter: any; distance: number; index: number } | null> {
+  if (shelters.length === 0) return null;
 
-      const [shelterLng, shelterLat] = shelterFeature.geometry.coordinates;
-      const shelter = { lat: shelterLat, lng: shelterLng };
+  try {
+    const requestBody: any = {
+      sources: [{ lat: userLat, lon: userLng }],
+      targets: shelters.map(shelter => {
+        const [shelterLng, shelterLat] = shelter.geometry.coordinates;
+        return { lat: shelterLat, lon: shelterLng };
+      }),
+      costing: 'auto'
+    };
 
-      // Attempt 1: Try with cached road graph if it exists and is valid
-      if (isCacheValid(lat, lng, shelter.lat, shelter.lng)) {
-        const graph = buildRoadGraph(roadNetworkCache.features);
-        const startId = findNearestInGraph(lat, lng, graph);
-        const endId = findNearestInGraph(shelter.lat, shelter.lng, graph);
+    // Add all exclusion zones as polygons
+    const zones = getExclusionZones();
+    if (zones.length > 0) {
+      requestBody.exclude_polygons = zones.map(zone => {
+        const [minLng, minLat, maxLng, maxLat] = zone;
+        return [[minLng, minLat], [maxLng, minLat], [maxLng, maxLat], [minLng, maxLat], [minLng, minLat]];
+      });
+    }
 
-        if (startId && endId) {
-          const path = aStar(graph, startId, endId, shelter.lat, shelter.lng);
-          if (path.length > 0) {
-            let pathCoords = buildPathCoordinates(path, graph, [shelter.lng, shelter.lat]);
-            pathCoords.unshift([lng, lat]);
-            if (pathCoords.length >= 2) {
-              const fylkeId = shelterFeature.properties?.fylke_id;
-              AddShortestPathLayer(map, pathCoords, fylkeId, shelterFeature);
-              return;
-            }
-          }
+    const response = await Promise.race([
+      fetch('/api/valhalla-route', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      }),
+      new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('Timeout')), API_TIMEOUT_MS))
+    ]) as Response;
+
+    if (response?.ok) {
+      const data = await response.json();
+      const matrix = data.sources_to_targets?.[0];
+
+      if (!matrix || matrix.length === 0) {
+        console.warn('Empty distance matrix returned');
+        return null;
+      }
+
+      // Find the shelter with the minimum distance (skip null/unreachable)
+      let minIndex = -1;
+      let minDistance = Infinity;
+
+      for (let i = 0; i < matrix.length; i++) {
+        const distance = matrix[i].distance;
+        if (distance !== null && distance !== undefined && distance < minDistance) {
+          minDistance = distance;
+          minIndex = i;
         }
       }
 
-      // Attempt 2: Fetch new road graph and retry
-      await ensureRoadNetworkLoaded(map, lat, lng, shelter.lat, shelter.lng);
-      if (!roadNetworkCache?.features) continue;
-
-      const graph = buildRoadGraph(roadNetworkCache.features);
-      const startId = findNearestInGraph(lat, lng, graph);
-      const endId = findNearestInGraph(shelter.lat, shelter.lng, graph);
-
-      if (!startId || !endId) continue;
-
-      const path = aStar(graph, startId, endId, shelter.lat, shelter.lng);
-      if (path.length === 0) continue;
-
-      let pathCoords = buildPathCoordinates(path, graph, [shelter.lng, shelter.lat]);
-      pathCoords.unshift([lng, lat]);
-
-      if (pathCoords.length >= 2) {
-        const fylkeId = shelterFeature.properties?.fylke_id;
-        AddShortestPathLayer(map, pathCoords, fylkeId, shelterFeature);
-        return;
+      if (minIndex === -1) {
+        console.warn('All shelters unreachable');
+        return null;
       }
+
+      return {
+        shelter: shelters[minIndex],
+        distance: minDistance,
+        index: minIndex
+      };
+    } else if (response?.status === 429) {
+      console.warn('Rate limited (429) on matrix request');
+      return null;
+    } else if (response?.status === 400) {
+      console.warn('Bad request on matrix (e.g., no path found or route blocked by exclusions)');
+      return null;
     }
   } catch (err) {
+    console.error('Failed to fetch matrix:', err);
+  }
+  return null;
+}
+
+async function getRoute(userLng: number, userLat: number, trgLng: number, trgLat: number): Promise<any> {
+  const cacheKey = `${userLng},${userLat};${trgLng},${trgLat}`;
+  if (ROUTE_CACHE.has(cacheKey)) return ROUTE_CACHE.get(cacheKey);
+
+  try {
+    const requestBody: any = {
+      locations: [
+        { lat: userLat, lon: userLng },
+        { lat: trgLat, lon: trgLng }
+      ],
+      costing: 'auto',
+      shape_match: 'map_snap',
+      filters: {
+        attributes: ['edge.polyline6'],
+        action: 'include'
+      }
+    };
+
+    // Add all exclusion zones as polygons
+    const zones = getExclusionZones();
+    if (zones.length > 0) {
+      requestBody.exclude_polygons = zones.map(zone => {
+        const [minLng, minLat, maxLng, maxLat] = zone;
+        return [[minLng, minLat], [maxLng, minLat], [maxLng, maxLat], [minLng, maxLat], [minLng, minLat]];
+      });
+    }
+
+    const response = await Promise.race([
+      fetch('/api/valhalla-route-polyline', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      }),
+      new Promise<Response>((_, reject) => setTimeout(() => reject(new Error('Timeout')), API_TIMEOUT_MS))
+    ]) as Response;
+
+    if (response?.ok) {
+      const data = await response.json();
+      const route = data.routes?.[0] || data.trip;
+      if (route) {
+        ROUTE_CACHE.set(cacheKey, route);
+        return route;
+      }
+    } else if (response?.status === 400) {
+      console.warn('Bad request (e.g., no path found or route blocked by exclusions)');
+      return null;
+    }
+  } catch (err) {
+    console.error('Failed to fetch route:', err);
+  }
+  return null;
+}
+
+
+export async function calculateAndDisplayPath(map: MaplibreGL.Map, lat: number, lng: number): Promise<void> {
+  try {
+    const shelters = await findNearestShelters(lat, lng, NUM_SHELTERS_TO_REQUEST);
+    if (!shelters.length) return;
+
+    // Use Matrix API to find the shortest path in one request
+    const shortestResult = await getShortestShelterViaMatrix(lng, lat, shelters);
+    if (!shortestResult) {
+      console.warn('No valid routes found for any shelter');
+      return;
+    }
+
+    const { shelter: shortestShelter } = shortestResult;
+    const [shelterLng, shelterLat] = shortestShelter.geometry.coordinates;
+
+    // Fetch the actual route with polyline for display
+    const route = await getRoute(lng, lat, shelterLng, shelterLat);
+    if (!route) {
+      console.warn('Failed to fetch route for shortest shelter');
+      return;
+    }
+
+    const shape = route.shape || route.legs?.[0]?.shape;
+    if (!shape) return console.warn('No shape found in route');
+
+    const pathCoords = decodePolyline6(shape);
+    if (pathCoords.length < 2) return console.warn('Not enough coordinates:', pathCoords.length);
+
+    const shelterFeature: ShelterFeature = shortestShelter.type === 'Feature'
+      ? (shortestShelter as ShelterFeature)
+      : { type: 'Feature', geometry: shortestShelter.geometry as GeoJSON.Point, properties: shortestShelter.properties || {} } as ShelterFeature;
+
+    AddShortestPathLayer(map, pathCoords, shortestShelter.properties?.fylke_id, shelterFeature);
+  } catch (err) {
     console.error('Shortest path error:', err);
+  }
+}
+
+export async function calculateAndDisplayPathToBuilding(map: MaplibreGL.Map, shelterLat: number, shelterLng: number, buildingKey: string): Promise<void> {
+  try {
+    console.log(`Fetching nearest ${buildingKey} buildings...`);
+    const buildings = await findNearestBuildings(shelterLat, shelterLng, buildingKey, 15);
+
+    if (!buildings.length) {
+      console.warn(`No ${buildingKey} buildings found`);
+      return;
+    }
+
+    console.log(`Found ${buildings.length} buildings for keys: ${buildingKey}`, buildings);
+
+    // Use Matrix API to find the shortest path from shelter to buildings
+    const shortestResult = await getShortestShelterViaMatrix(shelterLng, shelterLat, buildings);
+    if (!shortestResult) {
+      console.warn(`No valid routes found to any ${buildingKey}`);
+      return;
+    }
+
+    const { shelter: nearestBuilding } = shortestResult;
+    const [buildingLng, buildingLat] = nearestBuilding.geometry.coordinates;
+
+    // Fetch the actual route with polyline for display
+    const route = await getRoute(shelterLng, shelterLat, buildingLng, buildingLat);
+    if (!route) {
+      console.warn(`Failed to fetch route to nearest ${buildingKey}`);
+      return;
+    }
+
+    const shape = route.shape || route.legs?.[0]?.shape;
+    if (!shape) return console.warn('No shape found in route');
+
+    const pathCoords = decodePolyline6(shape);
+    if (pathCoords.length < 2) return console.warn('Not enough coordinates:', pathCoords.length);
+
+    const buildingFeature: ShelterFeature = nearestBuilding.type === 'Feature'
+      ? (nearestBuilding as ShelterFeature)
+      : { type: 'Feature', geometry: nearestBuilding.geometry as GeoJSON.Point, properties: nearestBuilding.properties || {} } as ShelterFeature;
+
+    AddShortestPathLayer(map, pathCoords, undefined, buildingFeature);
+  } catch (err) {
+    console.error(`Error routing to ${buildingKey}:`, err);
   }
 }
 

@@ -34,32 +34,11 @@ export interface ShelterFeatureProperties {
   [key: string]: unknown;
 }
 
-export interface GraphNode {
-  id: string;
-  neighbors: Array<{ nodeId: string; segment: any }>;
-  lat: number;
-  lng: number;
-}
-
-export interface RoadSegment {
-  coordinates: [number, number][];
-  distance: number;
-  start: any;
-  end: any;
-}
-
 export interface MapBounds {
   minLng: number;
   maxLng: number;
   minLat: number;
   maxLat: number;
-}
-
-export interface CacheBounds {
-  minLat: number;
-  maxLat: number;
-  minLng: number;
-  maxLng: number;
 }
 
 export interface StarsLayerOptions {

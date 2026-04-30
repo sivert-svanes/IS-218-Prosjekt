@@ -1,12 +1,24 @@
 ﻿import { AddLayerObject, LayerSpecification, LngLatLike, PropertyValueSpecification } from "maplibre-gl";
 import { registerKonamiCode } from './middleEarth.js';
-import {AddShelterLayerGeospatial, AddDSBWmsLayers, AddVannOgVassdragLayers, AddFKBVeiLayer} from './layer.js'
-import {registerStyleInMenu, initializeDropdownMenus} from './layerControl.js'
+import {
+  AddShelterLayerGeospatial,
+  AddDSBWmsLayers,
+  AddVannOgVassdragLayers,
+  AddFKBVeiLayer,
+  AddAmenityLayers,
+} from './layer.js'
+import {registerStyleInMenu, initializeDropdownMenus, layerCheckboxes} from './layerControl.js'
 import {registerStyle} from "./mapStyles.js";
 import { calculateAndDisplayPath, clearPath } from './shortestPath.js'
+import { initializeExclusionZones, refreshExclusionZones } from './exclusion.js'
+import { initializeExclusionDraw } from './exclusionDraw.js';
+import { initializeCoverageAnalysis } from './coverageAnalysis.js'
+import { initShelterDetailsModal } from './shelterDetails.js';
+import { initSearch } from './search.js';
 import { getMapStyle, GLOBE_FADE_CONFIG, DARK_PAINTS } from './mapStyles.js';
 import './interfaces.js';
 
+// MapLibre GL constants and utilities
 const maplibregl = window.maplibregl;
 if (!maplibregl) {
   console.warn('MapLibre GL not found on window as maplibregl');
@@ -19,24 +31,196 @@ if (!maplibregl) {
     zoom: 2 as number,
   });
 
+  function updateLoadingProgress(progress: number, status: string) {
+    const fill = document.getElementById('loading-bar-fill');
+    const statusEl = document.getElementById('loading-status');
+    if (fill) fill.style.width = `${progress}%`;
+    if (statusEl) statusEl.innerText = status;
+  }
+
+  function hideLoadingScreen() {
+    const screen = document.getElementById('loading-screen');
+    if (screen) {
+      screen.classList.add('hidden');
+      setTimeout(() => {
+        screen.style.display = 'none';
+      }, 500);
+    }
+  }
+
+  updateLoadingProgress(5, 'Initialiserer kart...');
+
   window.map = map;
   registerKonamiCode(map);
   initializeDropdownMenus();
+  initializeCoverageAnalysis(map);
 
-  const geolocate = new maplibregl.GeolocateControl({
-    positionOptions: { enableHighAccuracy: true as boolean },
-    trackUserLocation: true as boolean,
-    showAccuracyCircle: true as boolean,
-  });
-  map.addControl(geolocate, 'top-right');
+    const geolocate = new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+        showAccuracyCircle: true,
+    });
+    map.addControl(geolocate, 'top-right');
 
-  map.on('load', () => {
+    let isTracking = false;
+    geolocate.on('trackuserlocationstart', () => { isTracking = true; });
+    geolocate.on('trackuserlocationend', () => { isTracking = false; });
+    geolocate.on('error', () => { isTracking = false; });
+
+    //last minute shit dont care
+   // @ts-ignore
+   window.geolocate = geolocate;
+   // @ts-ignore
+   window.triggerGeolocate = function() {
+        if (!isTracking) {
+            try {
+                geolocate.trigger();
+            } catch (err) {
+                console.warn('Geolocate trigger failed:', err);
+            }
+        }
+    };
+
+    // @ts-ignore
+    window.stopGeolocate = function() {
+        if (isTracking) {
+            try {
+                geolocate.trigger();
+            } catch (err) {
+                console.warn('Geolocate stop failed:', err);
+            }
+        }
+    };
+
+    // @ts-ignore
+    window.togglePresetLayers = function(mode: string | null) {
+        const amenityTypes = ['chemist', 'trade', 'doctors', 'hospital', 'drinking_water', 'supermarket', 'convenience', 'hardware'];
+        const exclusionLayer = 'exclusion-zones-layer';
+
+        const setVisibility = (layerId: string, visible: boolean) => {
+            if (map.getLayer(layerId)) {
+                const visibility = visible ? 'visible' : 'none';
+                map.setLayoutProperty(layerId, 'visibility', visibility);
+                
+                // Sync UI checkbox if it exists
+                const cb = layerCheckboxes.get(layerId);
+                if (cb) {
+                    cb.checked = visible;
+                }
+            }
+        };
+
+        if (mode === 'logistics') {
+            amenityTypes.forEach(type => setVisibility(`amenity-layer-${type}`, true));
+            setVisibility(exclusionLayer, true);
+        } else if (mode === 'find-shelter') {
+            amenityTypes.forEach(type => setVisibility(`amenity-layer-${type}`, false));
+            setVisibility(exclusionLayer, true);
+        } else {
+            // Disable all when going back to menu or other modes
+            amenityTypes.forEach(type => setVisibility(`amenity-layer-${type}`, false));
+            setVisibility(exclusionLayer, false);
+        }
+    };
+
+    let isRotating = false;
+    let rotationStartTime = 0;
+
+    function rotate() {
+        if (!isRotating) return;
+        if (rotationStartTime === 0) rotationStartTime = Date.now();
+        const elapsed = Date.now() - rotationStartTime;
+
+        // Smoothly ramp up the rotation speed over 2 seconds to avoid sudden jumps
+        const rampUpDuration = 2000;
+        const targetSpeed = 1 / 1000; // 1 degree per second (in degrees/ms)
+        
+        let lonOffset;
+        if (elapsed < rampUpDuration) {
+            // Quadratic ramp up: distance = 0.5 * acceleration * t^2
+            // acceleration = targetSpeed / rampUpDuration
+            lonOffset = 0.5 * (targetSpeed / rampUpDuration) * elapsed * elapsed;
+        } else {
+            // Constant velocity after ramp up
+            const distAtRampUp = 0.5 * targetSpeed * rampUpDuration;
+            lonOffset = distAtRampUp + targetSpeed * (elapsed - rampUpDuration);
+        }
+
+        const lon = (8.4689 + lonOffset) % 360;
+        const lat = 60.4720 + 2 * Math.sin(elapsed / 15000);
+
+        map.setCenter([lon, lat]);
+        map.setBearing(0);
+        map.setPitch(0);
+        requestAnimationFrame(rotate);
+    }
+
+    // @ts-ignore
+    window.startRotation = function() {
+        if (!isRotating) {
+            isRotating = true;
+            rotate();
+        }
+    };
+
+    // @ts-ignore
+    window.stopRotation = function() {
+        isRotating = false;
+        rotationStartTime = 0;
+        map.setPitch(0);
+        map.setBearing(0);
+    };
+
+   // @ts-ignore
+    window.zoomToNorway = function() {
+        try {
+            map.setPadding({ left: 0, top: 0, right: 0, bottom: 0 });
+            map.flyTo({
+                center: [8.4689, 60.4720] as LngLatLike, // Center of Norway
+                zoom: 5.5,
+                pitch: 0,
+                bearing: 0,
+                duration: 1500, // Smooth animation duration in ms
+                essential: true
+            });
+        } catch (err) {
+            console.warn('Zoom to Norway failed:', err);
+        }
+    };
+
+    // @ts-ignore
+    window.zoomToGlobe = function() {
+        return new Promise<void>((resolve) => {
+            try {
+                const sidebarWidth = window.innerWidth * 0.2;
+                // Apply padding to center the globe in the area not covered by the sidebar
+                map.setPadding({ left: sidebarWidth, top: 0, right: 0, bottom: 0 });
+
+                map.flyTo({
+                    center: [8.4689, 60.4720] as LngLatLike,
+                    zoom: 4, 
+                    pitch: 0,
+                    bearing: 0,
+                    duration: 2000,
+                    essential: true
+                });
+                // Resolve exactly when duration ends for perfect timing
+                setTimeout(() => resolve(), 2000);
+            } catch (err) {
+                console.warn('Zoom to globe failed:', err);
+                resolve();
+            }
+        });
+    };
+
+
+/*  map.on('load', () => {
     try {
       geolocate?.trigger();
     } catch (err) {
       console.warn('Geolocate trigger failed:', err);
     }
-  });
+  });*/
 
   const scale = new maplibregl.ScaleControl({ maxWidth: 320, unit: 'metric' });
   map.addControl(scale, 'bottom-left');
@@ -71,6 +255,9 @@ if (!maplibregl) {
     });
   }
 
+  // @ts-ignore
+  window.clearPath = () => clearPath(map);
+
   // Clear path button handler
   const clearPathBtn = document.getElementById('clear-path-btn');
   if (clearPathBtn) {
@@ -80,6 +267,7 @@ if (!maplibregl) {
   }
 
   map.on('style.load', () => {
+    updateLoadingProgress(15, 'Laster stiler og baselag...');
     map.setProjection({
       type: 'globe' as string,
     });
@@ -182,13 +370,65 @@ if (!maplibregl) {
       }
     });
 
+    // @ts-ignore
+    document.querySelectorAll('.maplibregl-ctrl').forEach(el => el.style.display = 'none')
     // Load all layers
     const fylkeIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15];
+    const totalLayers = 31; // Total estimated layers
+    let layersLoaded = 0;
+
+    const incrementProgress = (status: string) => {
+      layersLoaded++;
+      updateLoadingProgress((layersLoaded / totalLayers) * 100, `${status} (${layersLoaded}/${totalLayers})`);
+    };
+
     (async () => {
-      await AddShelterLayerGeospatial(map, fylkeIds);
+      // OSM and Stars are already starting to load
+      incrementProgress('Laster baselag...'); // OSM
+      incrementProgress('Laster stjernehimmel...'); // Stars
+
+      await initializeExclusionZones(map);
+      initializeExclusionDraw(map);
+      // @ts-ignore
+      window.refreshExclusionZones = () => refreshExclusionZones(map);
+      incrementProgress('Laster eksklusjonssoner...');
+
+      await AddShelterLayerGeospatial(map, fylkeIds, false, () => {
+        incrementProgress('Henter tilfluktsrom...');
+      });
+
+      await AddAmenityLayers(map, undefined, false, () => {
+        incrementProgress('Laster fasiliteter...');
+      });
+
       AddDSBWmsLayers(map);
+      incrementProgress('Kobler til DSB-tjenester...');
+      incrementProgress('Kobler til DSB-tjenester...');
+
       AddVannOgVassdragLayers(map);
+      incrementProgress('Laster hydrologidata...');
+      incrementProgress('Laster hydrologidata...');
+
       AddFKBVeiLayer(map);
+      incrementProgress('Laster transportnettverk...');
+
+      // Initialize shelter details modal functionality
+      updateLoadingProgress(100, 'Klargjør grensesnitt...');
+      initShelterDetailsModal(map);
+      initSearch(map);
+      
+      setTimeout(hideLoadingScreen, 500); // Give user a moment to see 100%
+
+      // Start rotation if we are in main menu
+      const mainMenu = document.getElementById('main-menu');
+      if (mainMenu && !mainMenu.classList.contains('active')) {
+         await (async () => {
+              // @ts-ignore
+              if (window.zoomToGlobe) await window.zoomToGlobe();
+              // @ts-ignore
+              if (window.startRotation) window.startRotation();
+          })();
+      }
     })().catch(err => console.error('Error loading layers:', err));
   });
 }

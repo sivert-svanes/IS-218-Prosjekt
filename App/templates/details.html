@@ -1,0 +1,184 @@
+﻿<!DOCTYPE html>
+<html lang="no">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tilfluktsrom Detaljer</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 600px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        .error {
+            background: #fee;
+            border-left: 4px solid #c33;
+            padding: 15px;
+            border-radius: 4px;
+            color: #c33;
+            margin-bottom: 20px;
+        }
+
+        .back-button {
+            display: inline-block;
+            margin-bottom: 30px;
+            padding: 10px 20px;
+            background: #667eea;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: background 0.3s;
+        }
+
+        .back-button:hover {
+            background: #764ba2;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+
+        .details-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+        }
+
+        .detail-item {
+            border-bottom: 1px solid #eee;
+            padding-bottom: 15px;
+        }
+
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            color: #333;
+            font-size: 16px;
+            word-break: break-word;
+        }
+
+        .no-data {
+            color: #999;
+            font-style: italic;
+        }
+
+        .route-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+            white-space: nowrap;
+            margin-left: 10px;
+        }
+
+        .route-button:hover {
+            background: #764ba2;
+        }
+
+        .route-button:active {
+            background: #5a3d8a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-button">← Tilbake til kart</a>
+
+        {% if error %}
+            <div class="error">
+                <strong>Feil:</strong> {{ error }}
+            </div>
+        {% elif shelter %}
+            <h1>Tilfluktsrom Detaljer</h1>
+            <div class="details-grid">
+                {% for key, value in shelter.items() %}
+                    <div class="detail-item">
+                        <div class="detail-label">{{ key }}</div>
+                        <div class="detail-value">
+                            {% if value is none or value == '' %}
+                                <span class="no-data">Ikke oppgitt</span>
+                            {% else %}
+                                {% if key == 'vann' or key == 'water' %}
+                                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                                        <span>{{ value }}</span>
+                                        <button class="route-button" data-building-key="water" data-shelter-lat="{{ shelter.get('latitude', shelter.get('lat', shelter.get('wgs84_north'))) }}" data-shelter-lng="{{ shelter.get('longitude', shelter.get('lng', shelter.get('wgs84_east'))) }}">
+                                            Rute til vann
+                                        </button>
+                                    </div>
+                                {% else %}
+                                    {{ value }}
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="error">
+                <strong>Feil:</strong> Tilfluktsrom ikke funnet.
+            </div>
+        {% endif %}
+    </div>
+
+    <script type="module">
+        import { calculateAndDisplayPathToBuilding, clearPath } from '../js/shortestPath.js';
+
+        // Get map reference from parent window if available
+        const mapContainer = window.opener || window.parent;
+
+        document.querySelectorAll('.route-button').forEach(button => {
+            button.addEventListener('click', async function() {
+                const buildingKey = this.getAttribute('data-building-key');
+                const shelterLat = parseFloat(this.getAttribute('data-shelter-lat'));
+                const shelterLng = parseFloat(this.getAttribute('data-shelter-lng'));
+
+                if (!isNaN(shelterLat) && !isNaN(shelterLng) && window.map) {
+                    clearPath(window.map);
+                    await calculateAndDisplayPathToBuilding(window.map, shelterLat, shelterLng, buildingKey);
+                    window.close();
+                } else {
+                    alert('Kunne ikke hente koordinater eller kartinstans');
+                }
+            });
+        });
+    </script>
+</body>
+</html>
+

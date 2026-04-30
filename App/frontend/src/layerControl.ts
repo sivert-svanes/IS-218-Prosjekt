@@ -142,3 +142,14 @@ export function registerStyleInMenu(styleId: string, label: string, visible: boo
   item.appendChild(span);
   stylesMenu.appendChild(item);
 }
+
+/**
+ * Remove a layer entry from the Layers dropdown and the internal map.
+ */
+export function deregisterLayer(layerId: string): void {
+  const cb = layerCheckboxes.get(layerId);
+  if (cb) {
+    cb.parentElement?.remove();
+    layerCheckboxes.delete(layerId);
+  }
+}

@@ -3,7 +3,12 @@ import {
   layerCheckboxes,
   registerLayer,
 } from './layerControl.js';
-import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId, MapBounds } from './interfaces.js';
+import { WmsRasterLayerConfig, ShelterFeature, ShelterFylkeId } from './interfaces.js';
+import { calculateBounds, buildEnumMapping, buildColorMapping, buildPatternConfig } from './utils.js';
+import { ExclusionZoneType, exclusionZoneColor, exclusionZonePattern } from './enum.js';
+import { buildPatternMapping } from './patterns.js';
+import { registerShelters } from './search.js';
+import { amenityLabels} from "./shelterDetails.js";
 
 const maplibregl = window.maplibregl;
 
@@ -17,12 +22,16 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
   const props = feature.properties || {} as Record<string, string>;
   const fid = props.fid || '';
 
+  const showDetails = (window as any).currentMode === 'logistics';
+
   const html = `
     <div id="s_${fid}" style="font-family: sans-serif; max-width: 260px;">
       <h3 style="margin: 0 0 6px 0; font-size: 14px;">Tilfluktsrom - ${props.romnr || 'Ukjent adresse'}</h3>
       ${props.plasser ? `<p style="margin: 2px 0;"><strong>Kapasitet:</strong> ${props.plasser} personer</p>` : ''}
       ${props.adresse ? `<p style="margin: 2px 0;"><strong>Adresse:</strong> ${props.adresse}</p>` : ''}
+      ${props.antall_plasser_igjen ? `<p style="margin: 2px 0;"><strong>Antall Plasser Igjen:</strong> ${props.antall_plasser_igjen}</p>` : ''}
       <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
+      ${showDetails ? `<p style="margin: 2px 0;"><a href="#" class="shelter-details-link" data-fid="${fid}" style="color: #3498db; cursor: pointer; text-decoration: underline;"><strong>Detaljer</strong></a></p>` : ''}
     </div>`;
 
   // Handle date line wrapping if needed
@@ -33,9 +42,53 @@ function createShelterPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature, lngLa
   }
 
   if (maplibregl) {
+    const popup = new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
+
+    // Add event listener to the details link after popup is created
+    setTimeout(() => {
+      const link = document.querySelector(`#s_${fid} .shelter-details-link`) as HTMLElement;
+      if (link) {
+        link.addEventListener('click', (e: Event) => {
+          e.preventDefault();
+          window.openShelterDetailsModal(parseInt(fid), feature as GeoJSON.Feature<GeoJSON.Point>);
+        });
+      }
+    }, 0);
+  }
+
+  fetch(`/api/shelter-status/${fid}`)
+    .then((res) => res.json())
+    .then((data) => {
+      const el = document.getElementById(props.fid);
+      if (el) {
+        el.textContent = data?.antall_plasser_igjen ?? 'Ukjent';
+      }
+    })
+    .catch(() => {
+      const el = document.getElementById(props.fid);
+      if (el) {
+        el.textContent = 'Feil ved lasting';
+      }
+    });
+}
+
+function createBuildingPopup(map: MaplibreGL.Map, feature: GeoJSON.Feature<GeoJSON.Point>): void {
+  const coords = feature.geometry.coordinates.slice() as [number, number];
+  const props = feature.properties || {} as Record<string, any>;
+
+  const html = `
+    <div style="font-family: sans-serif; max-width: 260px;">
+      <h3 style="margin: 0 0 6px 0; font-size: 14px;">Destinasjon</h3>
+      ${props.key ? `<p style="margin: 2px 0;"><strong>Type:</strong> ${amenityLabels[props.key]}</p>` : ''}
+      ${props.distance_km ? `<p style="margin: 2px 0;"><strong>Avstand:</strong> ${props.distance_km} km</p>` : ''}
+      <p style="margin: 2px 0;"><strong>Koordinater:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
+    </div>`;
+
+  if (maplibregl) {
     new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
   }
 }
+
 // Layer configuration constants
 // Geonorge Vann og vassdrag layers
 // Layer names sourced from GetCapabilities: wms.norges_grunnkart
@@ -169,13 +222,16 @@ export function AddFKBVeiLayer(map: MaplibreGL.Map, visible: boolean = false): v
  * @param fylkeIds The ids of the counties to request
  * @param visible Controls if the layer is displayed once it's been loaded
  */
-export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: number[], visible: boolean = false): Promise<void> {
+export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: number[], visible: boolean = false, onProgress?: (fylkeId: number) => void): Promise<void> {
   const layerVisibility = visible ? 'visible' : 'none';
 
   for (const fylkeId of fylkeIds) {
     try {
       const res = await fetch(`/api/fylke/${fylkeId}`);
       const geojson = await res.json();
+
+      // Register shelters for search functionality
+      registerShelters(fylkeId, geojson);
 
       const sourceId = `shelters-fylke-${fylkeId}`;
       const layerId  = `shelters-circle-${fylkeId}`;
@@ -198,6 +254,8 @@ export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: n
 
       registerLayer(layerId, `Tilfluktsrom - ${fylkeNavn}`, visible, map);
 
+      if (onProgress) onProgress(fylkeId);
+
       map.on('click', layerId, (e) => {
         if (!e.features || e.features.length === 0) return;
         const feature = e.features[0];
@@ -215,21 +273,6 @@ export async function AddShelterLayerGeospatial(map: MaplibreGL.Map, fylkeIds: n
   }
 }
 
-function calculateBounds(coordinates: [number, number][]): { minLng: number; maxLng: number; minLat: number; maxLat: number } {
-  let minLng = coordinates[0][0];
-  let maxLng = coordinates[0][0];
-  let minLat = coordinates[0][1];
-  let maxLat = coordinates[0][1];
-
-  for (const [lng, lat] of coordinates) {
-    minLng = Math.min(minLng, lng);
-    maxLng = Math.max(maxLng, lng);
-    minLat = Math.min(minLat, lat);
-    maxLat = Math.max(maxLat, lat);
-  }
-
-  return { minLng, maxLng, minLat, maxLat };
-}
 
 /**
  * Adds the shortest path layer to the map with a green line. Removes any existing shortest path layer/source first.
@@ -239,7 +282,6 @@ function calculateBounds(coordinates: [number, number][]): { minLng: number; max
  * @param destinationShelterFylkeId The fylke ID where the shelter is located (optional)
  * @param shelterFeature The shelter feature to display popup for (optional)
  */
-
 export function AddShortestPathLayer(
   map: MaplibreGL.Map,
   coordinates: [number, number][],
@@ -283,19 +325,29 @@ export function AddShortestPathLayer(
       essential: true
     });
 
-    if (destinationShelterFylkeId && shelterFeature?.geometry.type === 'Point') {
-      const shelterLayerId = `shelters-circle-${destinationShelterFylkeId}`;
+    if (shelterFeature?.geometry.type === 'Point') {
+      // For shelter destinations with fylkeId, show the shelter layer
+      if (destinationShelterFylkeId) {
+        const shelterLayerId = `shelters-circle-${destinationShelterFylkeId}`;
 
-      if (map.getLayer(shelterLayerId)) {
-        map.setLayoutProperty(shelterLayerId, 'visibility', 'visible');
+        if (map.getLayer(shelterLayerId)) {
+          map.setLayoutProperty(shelterLayerId, 'visibility', 'visible');
 
-        const cb = layerCheckboxes.get(shelterLayerId);
-        if (cb) cb.checked = true;
+          const cb = layerCheckboxes.get(shelterLayerId);
+          if (cb) cb.checked = true;
 
+          try {
+            createShelterPopup(map, shelterFeature);
+          } catch (err) {
+            console.error('Error triggering popup:', err);
+          }
+        }
+      } else {
+        // For building destinations (no fylkeId), create a simple popup
         try {
-          createShelterPopup(map, shelterFeature);
+          createBuildingPopup(map, shelterFeature);
         } catch (err) {
-          console.error('Error triggering popup:', err);
+          console.error('Error creating building popup:', err);
         }
       }
     }
@@ -318,4 +370,252 @@ export function ClearShortestPathLayer(map: MaplibreGL.Map): void {
 
   const btn = document.getElementById('clear-path-btn');
   if (btn) btn.style.display = 'none';
+}
+
+export function AddExclusionZonesLayer(map: MaplibreGL.Map, geojsonData: GeoJSON.FeatureCollection): void {
+  const sourceId = 'exclusion-zones-source';
+  const layerId = 'exclusion-zones-layer';
+  const outlineLayerId = `${layerId}-line`;
+  const labelSourceId = 'exclusion-zones-labels-source';
+  const labelLayerId = 'exclusion-zones-labels-layer';
+
+  // Remove existing layers and source if they exist
+  if (map.getLayer(labelLayerId)) map.removeLayer(labelLayerId);
+  if (map.getLayer(outlineLayerId)) map.removeLayer(outlineLayerId);
+  if (map.getLayer(layerId)) map.removeLayer(layerId);
+  if (map.getSource(labelSourceId)) map.removeSource(labelSourceId);
+  if (map.getSource(sourceId)) map.removeSource(sourceId);
+
+
+  // Add source with all exclusion zones
+  map.addSource(sourceId, {
+    type: 'geojson',
+    data: geojsonData
+  });
+
+  // Create point features at the center of each polygon for labeling
+  const labelPoints: GeoJSON.FeatureCollection = {
+    type: 'FeatureCollection',
+    features: geojsonData.features.map((feature) => {
+      // Calculate the visual center (pole of inaccessibility) of the polygon
+      const coords = (feature.geometry as GeoJSON.Polygon).coordinates[0];
+
+      // Simple approach: find the centroid that is inside the polygon
+      // For rectangular exclusion zones, this should work well
+      const bounds = {
+        minLng: Infinity,
+        maxLng: -Infinity,
+        minLat: Infinity,
+        maxLat: -Infinity
+      };
+
+      for (const [lng, lat] of coords) {
+        bounds.minLng = Math.min(bounds.minLng, lng);
+        bounds.maxLng = Math.max(bounds.maxLng, lng);
+        bounds.minLat = Math.min(bounds.minLat, lat);
+        bounds.maxLat = Math.max(bounds.maxLat, lat);
+      }
+
+      // Center of bounding box (works well for rectangular polygons)
+      const centroidLng = (bounds.minLng + bounds.maxLng) / 2;
+      const centroidLat = (bounds.minLat + bounds.maxLat) / 2;
+
+      return {
+        type: 'Feature' as const,
+        properties: {
+          type: feature.properties?.type || 'Unknown'
+        },
+        geometry: {
+          type: 'Point' as const,
+          coordinates: [centroidLng, centroidLat]
+        }
+      };
+    })
+  };
+
+  const typeMapping = buildEnumMapping(ExclusionZoneType);
+  const colorMapping = buildColorMapping(ExclusionZoneType, exclusionZoneColor);
+
+  // Build pattern configuration from enum
+  const patternConfig = buildPatternConfig(exclusionZonePattern);
+
+  const patternMapping = buildPatternMapping(map, ExclusionZoneType, exclusionZoneColor, patternConfig);
+
+  // Add source for label points
+  map.addSource(labelSourceId, {
+    type: 'geojson',
+    data: labelPoints
+  });
+
+  // Add fill layer
+  map.addLayer({
+    id: layerId,
+    type: 'fill',
+    source: sourceId as any,
+    paint: {
+      'fill-pattern': patternMapping as any,
+    }
+  });
+
+  // Add line layer on top for visible outline
+  map.addLayer({
+    id: outlineLayerId,
+    type: 'line',
+    source: sourceId,
+    paint: {
+      'line-color': colorMapping as any,
+      'line-width': 2,
+      'line-opacity': 0.6,
+      'line-dasharray': [2, 2]
+    }
+  });
+
+  map.addLayer({
+    id: labelLayerId,
+    type: 'symbol',
+    source: labelSourceId as any,
+    minzoom: 6,
+    layout: {
+      'text-field': ['format', 'Exclusion Zone\n', {}, typeMapping as any, {}] as any,
+      'text-size': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8, 13,
+        16, 15
+      ],
+      'text-anchor': 'center',
+      'text-font': ['Space Mono Bold'],
+      'text-justify': 'center',
+      'text-line-height': 1.2,
+      'text-allow-overlap': false,
+      'text-ignore-placement': false
+    },
+    paint: {
+      'text-color': '#ffffff',
+      'text-halo-color': colorMapping as any,
+      'text-halo-width': 1.0,
+      'text-halo-blur': 0.0
+    }
+  });
+
+  // Register only the fill layer, and sync outline and label visibility with it
+  registerLayer(layerId, 'Exclusion Zones', true, map);
+
+  // Sync the outline and label layer visibility with the fill layer
+  const originalSetLayoutProperty = map.setLayoutProperty.bind(map);
+  const syncVisibility = (layerIdToSync: string, visibility: string) => {
+    if (layerIdToSync === layerId) {
+      originalSetLayoutProperty(outlineLayerId, 'visibility', visibility);
+      originalSetLayoutProperty(labelLayerId, 'visibility', visibility);
+    }
+  };
+
+  // Override setLayoutProperty to sync visibility
+  (map as any).setLayoutProperty = function(layerIdToOverride: string, name: string, value: any) {
+    originalSetLayoutProperty(layerIdToOverride, name, value);
+    if (name === 'visibility') {
+      syncVisibility(layerIdToOverride, value);
+    }
+    return this;
+  };
+}
+
+/**
+ * Adds amenity layers to the map for each amenity type.
+ * Supports displaying convenience stores, doctors, drinking water, hardware, supermarkets, and trade facilities.
+ * @param map The MapLibre map instance
+ * @param amenityTypes Optional array of specific amenity types to load. If not provided, loads all types.
+ * @param visible Controls if the layers are displayed once they've been loaded
+ */
+export async function AddAmenityLayers(
+  map: MaplibreGL.Map,
+  amenityTypes?: string[],
+  visible: boolean = false,
+  onProgress?: (amenityType: string) => void
+): Promise<void> {
+  const { AmenityType, amenityColor } = await import('./enum.js');
+
+  // Use all types if not specified
+  const typesToLoad = amenityTypes || Object.values(AmenityType);
+  const layerVisibility = visible ? 'visible' : 'none';
+
+  for (const amenityType of typesToLoad) {
+    try {
+      const res = await fetch(`/api/amenities/${amenityType}`);
+      const geojson = await res.json();
+
+      if (!geojson.features || geojson.features.length === 0) {
+        console.warn(`No amenities found for type: ${amenityType}`);
+        if (onProgress) onProgress(amenityType);
+        continue;
+      }
+
+      const sourceId = `amenity-source-${amenityType}`;
+      const layerId = `amenity-layer-${amenityType}`;
+      const label = amenityLabels[amenityType] || amenityType;
+
+      // Get color for this amenity type
+      const color = (amenityColor as Record<string, string>)[amenityType] || '#808080';
+
+      // Add the source
+      map.addSource(sourceId, { type: 'geojson', data: geojson });
+
+      // Add the layer
+      map.addLayer({
+        id: layerId,
+        type: 'circle',
+        source: sourceId,
+        paint: {
+          'circle-radius': 5,
+          'circle-color': color,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': '#ffffff',
+          'circle-opacity': 0.8,
+        },
+        layout: { visibility: layerVisibility },
+      });
+
+      // Create popup on click
+      map.on('click', layerId, (e) => {
+        if (!e.features || e.features.length === 0) return;
+        const feature = e.features[0];
+        const coords = (feature.geometry as GeoJSON.Point).coordinates.slice() as [number, number];
+        const props = feature.properties || {} as Record<string, string>;
+
+        const html = `
+          <div style="font-family: sans-serif; max-width: 200px;">
+            <h3 style="margin: 0 0 6px 0; font-size: 14px;">${label}</h3>
+            <p style="margin: 2px 0;"><strong>Type:</strong> ${props.type || 'Unknown'}</p>
+            <p style="margin: 2px 0;"><strong>Coordinates:</strong> ${coords[1].toFixed(6)}, ${coords[0].toFixed(6)}</p>
+          </div>`;
+
+        // Handle date line wrapping if needed
+        if (e.lngLat) {
+          while (Math.abs(e.lngLat.lng - coords[0]) > 180) {
+            coords[0] += e.lngLat.lng > coords[0] ? 360 : -360;
+          }
+        }
+
+        if (maplibregl) {
+          new maplibregl.Popup({ offset: 10 }).setLngLat(coords).setHTML(html).addTo(map);
+        }
+      });
+
+      // Change cursor on hover
+      map.on('mouseenter', layerId, () => { map.getCanvas().style.cursor = 'pointer'; });
+      map.on('mouseleave', layerId, () => { map.getCanvas().style.cursor = ''; });
+
+      // Register the layer in the layer control
+      registerLayer(layerId, label, visible, map);
+
+      if (onProgress) onProgress(amenityType);
+
+      await new Promise(resolve => setTimeout(resolve, 50));
+
+    } catch (err) {
+      console.error(`Failed to load amenities for type ${amenityType}:`, err);
+      if (onProgress) onProgress(amenityType);
+    }
+  }
 }
