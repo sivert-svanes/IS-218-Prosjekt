@@ -10,7 +10,7 @@ low supply and provide routes to get supplies, accounting for threats.
 > <details>
 > <summary style="font-size: 14px; font-weight: bold">System Demonstration</summary>
 >
-> [Video: ShelterLog System Demo](https://github.com/user-attachments/assets/1407934f-f65c-4393-95d0-411da9efb977)
+> [Video: ShelterLog System Demo](https://github.com/user-attachments/assets/5c992780-a2aa-41cc-8a2d-52d6fa990b9b)
 >
 > </details>
 
