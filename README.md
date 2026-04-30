@@ -72,7 +72,7 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │                                                       │  │
 │   │ layerControl.ts - Manages UI and layers               │  │
 │   │  - Manages dropdown menus for layer toggling          │  │
-│   │  - Functions for regestering styles and layers        │  │
+│   │  - Functions for registering styles and layers        │  │
 │   │                                                       │  │
 │   │ shortestPath.ts - Pathfinding & Route Calculation     │  │
 │   │  - Implements A* algorithm for path finding           │  │
@@ -80,12 +80,53 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │                                                       │  │
 │   │ mapStyles.ts - Map Styling & Visual Effects           │  │
 │   │  - Defines base style and custom styles               │  │
-│   │  - Registrers new styles                              │  │
+│   │  - Registers new styles                               │  │
 │   │                                                       │  │
 │   │ starsLayer.ts - Custom WebGL Star Field               │  │
 │   │  - Generates procedural star field using WebGL        │  │
-│   │  - Renders with camera-relative parrallax             │  │
+│   │  - Renders with camera-relative parallax              │  │
 │   │  - Because its cool                                   │  │
+│   │                                                       │  │
+│   │ coverageAnalysis.ts - Coverage Analysis Visualization │  │
+│   │  - Visualizes shelter coverage with grid overlays     │  │
+│   │  - Calculates and displays coverage statistics        │  │
+│   │  - Fetches population data and coverage analysis      │  │
+│   │                                                       │  │
+│   │ search.ts - Shelter Search & Filtering                │  │
+│   │  - Registers and indexes shelters by county           │  │
+│   │  - Provides fuzzy search functionality                │  │
+│   │  - Handles shelter filtering and display              │  │
+│   │                                                       │  │
+│   │ shelterDetails.ts - Shelter Information Display       │  │
+│   │  - Displays detailed shelter information              │  │
+│   │  - Manages amenity buttons (water, food, equipment)   │  │
+│   │  - Fetches nearby amenities from OSM data             │  │
+│   │                                                       │  │
+│   │ exclusion.ts - Exclusion Zone Management              │  │
+│   │  - Fetches and manages exclusion zones                │  │
+│   │  - Handles flood zones, hazards, warzones, etc.       │  │
+│   │  - Provides bounds calculation for zones              │  │
+│   │                                                       │  │
+│   │ exclusionDraw.ts - Exclusion Zone Drawing Tool        │  │
+│   │  - Drawing interface for custom exclusion zones       │  │
+│   │  - Allows users to mark danger areas on map           │  │
+│   │                                                       │  │
+│   │ patterns.ts - Custom Layer Patterns & Styling         │  │
+│   │  - Defines pattern fills for exclusion zones          │  │
+│   │  - Custom visual effects for layer rendering          │  │
+│   │                                                       │  │
+│   │ middleEarth.ts - Easter Egg / Theme System            │  │
+│   │  - Alternative map styling (LOTR-themed)              │  │
+│   │  - Custom layer variations                            │  │
+│   │                                                       │  │
+│   │ enum.ts - Enumerations & Constants                    │  │
+│   │  - Amenity types and exclusion zone types             │  │
+│   │  - Color mappings for visual elements                 │  │
+│   │                                                       │  │
+│   │ utils.ts - Utility Functions                          │  │
+│   │  - Coordinate bounds calculation                      │  │
+│   │  - Geometry processing helpers                        │  │
+│   │  - Common mathematical utilities                      │  │
 │   │                                                       │  │
 │   │ interfaces.ts - TypeScript Type Definitions           │  │
 │   │  - Shelter features and WMS layer configurations      │  │
@@ -101,11 +142,31 @@ low supply and provide routes to get supplies, accounting for threats.
 ┌──────────────────────▼───────────────────────────────────────┐
 │                  Backend (Flask/Python)                      │
 │   ┌───────────────────────────────────────────────────────┐  │
+│   │ app.py - Flask Application & WMS Proxy                │  │
+│   │  - Main Flask application entry point                 │  │
+│   │  - WMS tile proxy with memory/disk caching            │  │
+│   │  - Tile cache management and filtering                │  │
+│   │  - County bbox computation for tile filtering         │  │
+│   │                                                       │  │
+│   │ database.py - Database Abstraction Layer              │  │
+│   │  - SQLAlchemy ORM and connection pooling              │  │
+│   │  - PostGIS spatial queries and functions              │  │
+│   │  - Coverage analysis and caching                      │  │
+│   │  - Road type enumerations                             │  │
+│   │  - Coordinate system conversions                      │  │
+│   │                                                       │  │
+│   │ raster.py - Raster Data Processing (WMS) (UNUSED)     │  │
+│   │  - WMS tile fetching and caching                      │  │
+│   │  - Raster to array conversion (PNG to numpy)          │  │
+│   │  - Coordinate system transformations                  │  │
+│   │                                                       │  │
 │   │  API Endpoints:                                       │  │
 │   │  - /api/fylke/{id} - Get shelters by county           │  │
 │   │  - /api/nearest-shelters - Find k-nearest shelters    │  │
 │   │  - /api/wms-proxy - mem/disk cache for WMS raster     │  │
 │   │  - /api/nvdb/roads - Query road network data          │  │
+│   │  - /api/exclusion-zones - Fetch exclusion zones       │  │
+│   │  - /api/coverage-analysis/{id} - Coverage stats       │  │
 │   │                                                       │  │
 │   │  HTTP Methods:                                        │  │
 │   │  - Get_Index: POST - Renders index                    │  │
@@ -119,6 +180,8 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - get_shelters_within_fylke: Fetch shelters by id    │  │
 │   │  - get_k_nearest_shelters: K-NN spatial search        │  │
 │   │  - get_nvdb_roads_geojson: Query road network         │  │
+│   │  - get_exclusion_zones: Fetch exclusion zones         │  │
+│   │  - get_coverage_analysis: Coverage statistics         │  │
 │   │  - build_geojson_feature: Utility for GeoJSON format  │  │
 │   │  - build_geojson_collection: Aggregate GeoJSON data   │  │
 │   └───────────────────────────────────────────────────────┘  │
