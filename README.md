@@ -10,7 +10,7 @@ low supply and provide routes to get supplies, accounting for threats.
 > <details>
 > <summary style="font-size: 14px; font-weight: bold">System Demonstration</summary>
 >
-> [Video: ShelterLog System Demo](https://github.com/user-attachments/assets/1407934f-f65c-4393-95d0-411da9efb977)
+> [Video: ShelterLog System Demo](https://github.com/user-attachments/assets/5c992780-a2aa-41cc-8a2d-52d6fa990b9b)
 >
 > </details>
 
@@ -47,7 +47,6 @@ low supply and provide routes to get supplies, accounting for threats.
 | Dataset              | Source                                                                                                                  | Format   | Processing                                                                 |
 |----------------------|-------------------------------------------------------------------------------------------------------------------------|----------|----------------------------------------------------------------------------|
 | Emergency Shelters   | [GeoNorge](https://kartkatalog.geonorge.no/metadata/tilfluktsrom-offentlige/dbae9aae-10e7-4b75-8d67-7f0e8828f3d8)       | GML      | Converted to PostGIS geometry, indexed for spatial queries                 |
-| NVDB                 | [Statens Vegvesen](https://www.nvdb.no/hent-og-se-data/eksport/nvdb-eksport/brukerveiledning/)                          | WKT(CSV) | Converted to PostGIS geometry, spatial indexing, TOAST compression         |
 | County Boundaries    | [GeoNorge](https://kartkatalog.geonorge.no/metadata/administrative-enheter-fylker/6093c8a8-fa80-11e6-bc64-92361f002671) | GeoJSON  | Converted to PostGIS polygons for administrative filtering                 |
 | Map Style            | [OpenMapTiles](https://raw.githubusercontent.com/openmaptiles/positron-gl-style/refs/heads/master/style.json)           | JSON     | Applied globe projection and custom styling                                |
 | FKB                  | [Kartverket](https://wms.geonorge.no/skwms1/wms.fkb?service=wms&request=getcapabilities)                                | WMS      | Caching of tiles in memory and on disk                                     |
@@ -72,7 +71,7 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │                                                       │  │
 │   │ layerControl.ts - Manages UI and layers               │  │
 │   │  - Manages dropdown menus for layer toggling          │  │
-│   │  - Functions for regestering styles and layers        │  │
+│   │  - Functions for registering styles and layers        │  │
 │   │                                                       │  │
 │   │ shortestPath.ts - Pathfinding & Route Calculation     │  │
 │   │  - Implements A* algorithm for path finding           │  │
@@ -80,12 +79,53 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │                                                       │  │
 │   │ mapStyles.ts - Map Styling & Visual Effects           │  │
 │   │  - Defines base style and custom styles               │  │
-│   │  - Registrers new styles                              │  │
+│   │  - Registers new styles                               │  │
 │   │                                                       │  │
 │   │ starsLayer.ts - Custom WebGL Star Field               │  │
 │   │  - Generates procedural star field using WebGL        │  │
-│   │  - Renders with camera-relative parrallax             │  │
+│   │  - Renders with camera-relative parallax              │  │
 │   │  - Because its cool                                   │  │
+│   │                                                       │  │
+│   │ coverageAnalysis.ts - Coverage Analysis Visualization │  │
+│   │  - Visualizes shelter coverage with grid overlays     │  │
+│   │  - Calculates and displays coverage statistics        │  │
+│   │  - Fetches population data and coverage analysis      │  │
+│   │                                                       │  │
+│   │ search.ts - Shelter Search & Filtering                │  │
+│   │  - Registers and indexes shelters by county           │  │
+│   │  - Provides fuzzy search functionality                │  │
+│   │  - Handles shelter filtering and display              │  │
+│   │                                                       │  │
+│   │ shelterDetails.ts - Shelter Information Display       │  │
+│   │  - Displays detailed shelter information              │  │
+│   │  - Manages amenity buttons (water, food, equipment)   │  │
+│   │  - Fetches nearby amenities from OSM data             │  │
+│   │                                                       │  │
+│   │ exclusion.ts - Exclusion Zone Management              │  │
+│   │  - Fetches and manages exclusion zones                │  │
+│   │  - Handles flood zones, hazards, warzones, etc.       │  │
+│   │  - Provides bounds calculation for zones              │  │
+│   │                                                       │  │
+│   │ exclusionDraw.ts - Exclusion Zone Drawing Tool        │  │
+│   │  - Drawing interface for custom exclusion zones       │  │
+│   │  - Allows users to mark danger areas on map           │  │
+│   │                                                       │  │
+│   │ patterns.ts - Custom Layer Patterns & Styling         │  │
+│   │  - Defines pattern fills for exclusion zones          │  │
+│   │  - Custom visual effects for layer rendering          │  │
+│   │                                                       │  │
+│   │ middleEarth.ts - Easter Egg / Theme System            │  │
+│   │  - Alternative map styling (LOTR-themed)              │  │
+│   │  - Custom layer variations                            │  │
+│   │                                                       │  │
+│   │ enum.ts - Enumerations & Constants                    │  │
+│   │  - Amenity types and exclusion zone types             │  │
+│   │  - Color mappings for visual elements                 │  │
+│   │                                                       │  │
+│   │ utils.ts - Utility Functions                          │  │
+│   │  - Coordinate bounds calculation                      │  │
+│   │  - Geometry processing helpers                        │  │
+│   │  - Common mathematical utilities                      │  │
 │   │                                                       │  │
 │   │ interfaces.ts - TypeScript Type Definitions           │  │
 │   │  - Shelter features and WMS layer configurations      │  │
@@ -101,11 +141,43 @@ low supply and provide routes to get supplies, accounting for threats.
 ┌──────────────────────▼───────────────────────────────────────┐
 │                  Backend (Flask/Python)                      │
 │   ┌───────────────────────────────────────────────────────┐  │
+│   │ app.py - Flask Application & WMS Proxy                │  │
+│   │  - Main Flask application entry point                 │  │
+│   │  - WMS tile proxy with memory/disk caching            │  │
+│   │  - Tile cache management and filtering                │  │
+│   │  - County bbox computation for tile filtering         │  │
+│   │                                                       │  │
+│   │ database.py - Database Abstraction Layer              │  │
+│   │  - SQLAlchemy ORM and connection pooling              │  │
+│   │  - PostGIS spatial queries and functions              │  │
+│   │  - Coverage analysis and caching                      │  │
+│   │  - Road type enumerations                             │  │
+│   │  - Coordinate system conversions                      │  │
+│   │                                                       │  │
+│   │ raster.py - Raster Data Processing (WMS)              │  │
+│   │  - WMS tile fetching and caching                      │  │
+│   │  - Raster to array conversion (PNG to numpy)          │  │
+│   │  - Coordinate system transformations                  │  │
+│   │                                                       │  │
 │   │  API Endpoints:                                       │  │
-│   │  - /api/fylke/{id} - Get shelters by county           │  │
-│   │  - /api/nearest-shelters - Find k-nearest shelters    │  │
-│   │  - /api/wms-proxy - mem/disk cache for WMS raster     │  │
-│   │  - /api/nvdb/roads - Query road network data          │  │
+│   │  - GET / - Renders main index                         │  │
+│   │  - GET /api/fylke/{id} - Get shelters by county       │  │
+│   │  - GET /api/fylker - Get all counties                 │  │
+│   │  - GET /api/nearest-shelters - K-nearest shelters     │  │
+│   │  - GET /shelter-details/{fid} - Render detail page    │  │
+│   │  - GET /api/shelter-details/{fid} - Shelter JSON      │  │
+│   │  - GET /api/amenities - Get all amenity types         │  │
+│   │  - GET /api/amenities/{type} - Get amenities by type  │  │
+│   │  - GET /api/nearest-buildings - Find nearby POIs      │  │
+│   │  - POST /api/valhalla-route - Matrix routing          │  │
+│   │  - POST /api/valhalla-route-polyline - Route polyline │  │
+│   │  - GET /api/nvdb/roads - Query road network data      │  │
+│   │  - GET /api/coverage-analysis - Coverage statistics   │  │
+│   │  - GET /api/fylke-outline/{id} - County boundaries    │  │
+│   │  - GET /api/exclusion-zones - Fetch exclusion zones   │  │
+│   │  - POST /api/exclusion-zones - Add exclusion zone     │  │
+│   │  - GET /api/wms-proxy - WMS tile proxy with caching   │  │
+│   │  - GET /api/brannstasjoner - Fire stations (legacy)   │  │
 │   │                                                       │  │
 │   │  HTTP Methods:                                        │  │
 │   │  - Get_Index: POST - Renders index                    │  │
@@ -119,8 +191,11 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - get_shelters_within_fylke: Fetch shelters by id    │  │
 │   │  - get_k_nearest_shelters: K-NN spatial search        │  │
 │   │  - get_nvdb_roads_geojson: Query road network         │  │
+│   │  - get_exclusion_zones: Fetch exclusion zones         │  │
+│   │  - get_coverage_analysis: Coverage statistics         │  │
 │   │  - build_geojson_feature: Utility for GeoJSON format  │  │
 │   │  - build_geojson_collection: Aggregate GeoJSON data   │  │
+│   │  - get_k_nearest_features: from selected table        │  │
 │   └───────────────────────────────────────────────────────┘  │
 └──────────────────────────────────────────────────────────────┘
 ```
@@ -175,22 +250,6 @@ low supply and provide routes to get supplies, accounting for threats.
 │   └─────────────────────────────────────────────────────┘    │ 
 │                                                              │
 │   ┌─────────────────────────────────────────────────────┐    │
-│   │ Table: nvdb_roads                                   │    │
-│   ├─────────────────────────────────────────────────────┤    │
-│   │ Columns:                                            │    │
-│   │  - ogc_fid: INTEGER, PK                             │    │
-│   │  - net.typeveg: CHARACTER VARYING                   │    │
-│   │  - geom_4326: GEOMETRY(LineString, 4326)            │    │
-│   │                                                     │    │
-│   │ Indexes:                                            │    │
-│   │  - ogc_fid: UNIQUE                                  │    │
-│   │  - geom_4326: GIST                                  │    │
-│   │  - net.typeveg: B-tree                              │    │
-│   │                                                     │    │
-│   │ Storage:                                            │    │
-│   │  - geom_4326: TOAST Compressed                      │    │
-│   └─────────────────────────────────────────────────────┘    │
-│   ┌─────────────────────────────────────────────────────┐    │
 │   │ Table: befolkning_rutenett_250m_2025                │    │
 │   ├─────────────────────────────────────────────────────┤    │
 │   │ Columns:                                            │    │
@@ -211,6 +270,104 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - ..._pkey: UNIQUE                                 │    │
 │   │  - ..._geometry_geom_idx: GIST                      │    │
 │   │                                                     │    │
+│   └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: exclusion_type                               │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - id: INTEGER, PK                                  │    │
+│   │  - type: VARCHAR(32), NOT NULL                      │    │
+│   │                                                     │    │
+│   │ Purpose:                                            │    │
+│   │ Defines enumeration of exclusion zone types:        │    │
+│   │  - Flood Zone, Radiation Hazard, Toxic Hazard       │    │
+│   │  - Biological Hazard, Fire, Ruins                   │    │
+│   │  - Active Warzone, Low Air Quality                  │    │
+│   └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: exclusionzone                                │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - id: INTEGER, PK                                  │    │
+│   │  - geom_wkt: TEXT, NOT NULL                         │    │
+│   │  - type: INTEGER, FK → exclusion_type(id)           │    │
+│   │                                                     │    │
+│   │ Purpose:                                            │    │
+│   │ Stores dangerous/hazardous areas to avoid during    │    │
+│   │ routing and shelter path calculations               │    │
+│   │                                                     │    │
+│   │ Foreign Keys:                                       │    │
+│   │  - type → exclusion_type(id)                        │    │
+│   └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: shelter_egenskaper                           │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - id: INTEGER, PK                                  │    │
+│   │  - shelter_id: INTEGER, FK → shelters(fid)          │    │
+│   │  - mat: INTEGER                                     │    │
+│   │  - vann: INTEGER                                    │    │
+│   │  - medisin: INTEGER                                 │    │
+│   │  - utstyr: INTEGER                                  │    │
+│   │  - plasser: INTEGER                                 │    │
+│   │  - mat_kapasitet: INTEGER                           │    │
+│   │  - vann_kapasitet: INTEGER                          │    │
+│   │  - medisin_kapasitet: INTEGER                       │    │
+│   │  - utstyr_kapasitet: INTEGER                        │    │
+│   │  - plasser_opptatt: INTEGER (default 0)             │    │
+│   │  - adresse: VARCHAR(52)                             │    │
+│   │  - posisjon: GEOMETRY(Point, 4326)                  │    │
+│   │  - romnr: INTEGER                                   │    │
+│   │                                                     │    │
+│   │ Purpose:                                            │    │
+│   │ Stores detailed supply and capacity info for each   │    │
+│   │ shelter (food, water, medicine, equipment, spaces)  │    │
+│   │                                                     │    │
+│   │ Foreign Keys:                                       │    │
+│   │  - shelter_id → shelters(fid)                       │    │
+│   └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ View: shelter_status                                │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - id: INTEGER                                      │    │
+│   │  - shelter_id: INTEGER                              │    │
+│   │  - er_fullt: BOOLEAN                                │    │
+│   │  - prosent_mat: DOUBLE                              │    │
+│   │  - prosent_vann: DOUBLE                             │    │
+│   │  - prosent_medisin: DOUBLE                          │    │
+│   │  - prosent_utstyr: DOUBLE                           │    │
+│   │  - dager_til_mat_tom: INTEGER                       │    │
+│   │  - dager_til_vann_tom: INTEGER                      │    │
+│   │  - dager_til_medisin_tom: INTEGER                   │    │
+│   │  - dager_til_utstyr_tom: INTEGER                    │    │
+│   │  - antall_plasser_igjen: INTEGER                    │    │
+│   │                                                     │    │
+│   │ Purpose:                                            │    │
+│   │ Aggregates shelter_egenskaper into status metrics   │    │
+│   │ for monitoring supply levels and occupancy.         │    │
+│   │ Calculates percentages and days-until-empty.        │    │
+│   │                                                     │    │
+│   │ Based on:                                           │    │
+│   │  - View built from shelter_egenskaper table         │    │
+│   └─────────────────────────────────────────────────────┘    │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: Buildings                                    │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - fid: BIGINT, PK                                  │    │
+│   │  - key: Varchar(24), NOT NULL                       │    │
+│   │  - wkt_geom: Point                                  │    │
+│   │                                                     │    │
+│   │ Purpose:                                            │    │
+│   │ Stores building point data for routing              │    │
+│   │                                                     │    │
+│   │ Indexes:                                            │    │
+│   │  - buildings_key_index: UNIQUE                      |    |
 │   └─────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────┘
 ```
