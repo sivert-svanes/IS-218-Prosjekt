@@ -155,18 +155,30 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - Road type enumerations                             │  │
 │   │  - Coordinate system conversions                      │  │
 │   │                                                       │  │
-│   │ raster.py - Raster Data Processing (WMS) (UNUSED)     │  │
+│   │ raster.py - Raster Data Processing (WMS)              │  │
 │   │  - WMS tile fetching and caching                      │  │
 │   │  - Raster to array conversion (PNG to numpy)          │  │
 │   │  - Coordinate system transformations                  │  │
 │   │                                                       │  │
 │   │  API Endpoints:                                       │  │
-│   │  - /api/fylke/{id} - Get shelters by county           │  │
-│   │  - /api/nearest-shelters - Find k-nearest shelters    │  │
-│   │  - /api/wms-proxy - mem/disk cache for WMS raster     │  │
-│   │  - /api/nvdb/roads - Query road network data          │  │
-│   │  - /api/exclusion-zones - Fetch exclusion zones       │  │
-│   │  - /api/coverage-analysis/{id} - Coverage stats       │  │
+│   │  - GET / - Renders main index                         │  │
+│   │  - GET /api/fylke/{id} - Get shelters by county       │  │
+│   │  - GET /api/fylker - Get all counties                 │  │
+│   │  - GET /api/nearest-shelters - K-nearest shelters     │  │
+│   │  - GET /shelter-details/{fid} - Render detail page    │  │
+│   │  - GET /api/shelter-details/{fid} - Shelter JSON      │  │
+│   │  - GET /api/amenities - Get all amenity types         │  │
+│   │  - GET /api/amenities/{type} - Get amenities by type  │  │
+│   │  - GET /api/nearest-buildings - Find nearby POIs      │  │
+│   │  - POST /api/valhalla-route - Matrix routing          │  │
+│   │  - POST /api/valhalla-route-polyline - Route polyline │  │
+│   │  - GET /api/nvdb/roads - Query road network data      │  │
+│   │  - GET /api/coverage-analysis - Coverage statistics   │  │
+│   │  - GET /api/fylke-outline/{id} - County boundaries    │  │
+│   │  - GET /api/exclusion-zones - Fetch exclusion zones   │  │
+│   │  - POST /api/exclusion-zones - Add exclusion zone     │  │
+│   │  - GET /api/wms-proxy - WMS tile proxy with caching   │  │
+│   │  - GET /api/brannstasjoner - Fire stations (legacy)   │  │
 │   │                                                       │  │
 │   │  HTTP Methods:                                        │  │
 │   │  - Get_Index: POST - Renders index                    │  │
@@ -274,6 +286,110 @@ low supply and provide routes to get supplies, accounting for threats.
 │   │  - ..._pkey: UNIQUE                                 │    │
 │   │  - ..._geometry_geom_idx: GIST                      │    │
 │   │                                                     │    │
+│   └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: brannstasjoner                               │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - id: INTEGER, PK                                  │    │
+│   │  - geom: GEOMETRY(Point, 4326)                      │    │
+│   │  - gml_id: VARCHAR                                  │    │
+│   │  - opphav: VARCHAR                                  │    │
+│   │  - brannstasjon: VARCHAR                            │    │
+│   │  - brannvesen: VARCHAR                              │    │
+│   │  - stasjonstype: VARCHAR                            │    │
+│   │  - kasernert: VARCHAR                               │    │
+│   │                                                     │    │
+│   │ Indexes:                                            │    │
+│   │  - id: UNIQUE                                       │    │
+│   │  - geom: GIST                                       │    │
+│   │                                                     │    │
+│   │ Note: Legacy table for fire stations (deprecated)   │    │
+│   └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: exclusion_type                               │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - id: INTEGER, PK                                  │    │
+│   │  - type: VARCHAR(32), NOT NULL                      │    │
+│   │                                                     │    │
+│   │ Purpose:                                            │    │
+│   │ Defines enumeration of exclusion zone types:        │    │
+│   │  - Flood Zone, Radiation Hazard, Toxic Hazard       │    │
+│   │  - Biological Hazard, Fire, Ruins                   │    │
+│   │  - Active Warzone, Low Air Quality                  │    │
+│   └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: exclusionzone                                │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - id: INTEGER, PK                                  │    │
+│   │  - geom_wkt: TEXT, NOT NULL                         │    │
+│   │  - type: INTEGER, FK → exclusion_type(id)           │    │
+│   │                                                     │    │
+│   │ Purpose:                                            │    │
+│   │ Stores dangerous/hazardous areas to avoid during    │    │
+│   │ routing and shelter path calculations               │    │
+│   │                                                     │    │
+│   │ Foreign Keys:                                       │    │
+│   │  - type → exclusion_type(id)                        │    │
+│   └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ Table: shelter_egenskaper                           │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - id: INTEGER, PK                                  │    │
+│   │  - shelter_id: INTEGER, FK → shelters(fid)          │    │
+│   │  - mat: INTEGER                                     │    │
+│   │  - vann: INTEGER                                    │    │
+│   │  - medisin: INTEGER                                 │    │
+│   │  - utstyr: INTEGER                                  │    │
+│   │  - plasser: INTEGER                                 │    │
+│   │  - mat_kapasitet: INTEGER                           │    │
+│   │  - vann_kapasitet: INTEGER                          │    │
+│   │  - medisin_kapasitet: INTEGER                       │    │
+│   │  - utstyr_kapasitet: INTEGER                        │    │
+│   │  - plasser_opptatt: INTEGER (default 0)             │    │
+│   │  - adresse: VARCHAR(52)                             │    │
+│   │  - posisjon: GEOMETRY(Point, 4326)                  │    │
+│   │  - romnr: INTEGER                                   │    │
+│   │                                                     │    │
+│   │ Purpose:                                            │    │
+│   │ Stores detailed supply and capacity info for each   │    │
+│   │ shelter (food, water, medicine, equipment, spaces)  │    │
+│   │                                                     │    │
+│   │ Foreign Keys:                                       │    │
+│   │  - shelter_id → shelters(fid)                       │    │
+│   └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│   ┌─────────────────────────────────────────────────────┐    │
+│   │ View: shelter_status                                │    │
+│   ├─────────────────────────────────────────────────────┤    │
+│   │ Columns:                                            │    │
+│   │  - id: INTEGER                                      │    │
+│   │  - shelter_id: INTEGER                              │    │
+│   │  - er_fullt: BOOLEAN                                │    │
+│   │  - prosent_mat: DOUBLE                              │    │
+│   │  - prosent_vann: DOUBLE                             │    │
+│   │  - prosent_medisin: DOUBLE                          │    │
+│   │  - prosent_utstyr: DOUBLE                           │    │
+│   │  - dager_til_mat_tom: INTEGER                       │    │
+│   │  - dager_til_vann_tom: INTEGER                      │    │
+│   │  - dager_til_medisin_tom: INTEGER                   │    │
+│   │  - dager_til_utstyr_tom: INTEGER                    │    │
+│   │  - antall_plasser_igjen: INTEGER                    │    │
+│   │                                                     │    │
+│   │ Purpose:                                            │    │
+│   │ Aggregates shelter_egenskaper into status metrics   │    │
+│   │ for monitoring supply levels and occupancy.         │    │
+│   │ Calculates percentages and days-until-empty.        │    │
+│   │                                                     │    │
+│   │ Based on:                                           │    │
+│   │  - View built from shelter_egenskaper table         │    │
 │   └─────────────────────────────────────────────────────┘    │
 └──────────────────────────────────────────────────────────────┘
 ```
